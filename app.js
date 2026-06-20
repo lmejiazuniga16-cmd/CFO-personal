@@ -395,20 +395,66 @@ window.closeDebtModal = () => {
   document.getElementById("debt-modal-bg").classList.remove("show");
 };
 
-window.registerDebtPayment = async (id) => {
+// Modal-based debt payment flow (replaces native prompt)
+let _payingDebtId = null;
+window.registerDebtPayment = (id) => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return;
-  const defaultAmount = debt.cuotaMensual;
-  const answer = prompt(`Registro de pago mensual para "${debt.nombre}"
-Monto sugerido: ${fmt(defaultAmount)}
-Ingresa el monto abonado:`, String(defaultAmount));
-  if (!answer) return;
-  const amount = parseFloat(answer.replace(/\./g, "").replace(/,/g, ""));
-  if (isNaN(amount) || amount <= 0) {
-    showToast("Monto inválido", true);
-    return;
-  }
+  _payingDebtId = id;
+  openDebtPayModal(debt);
+};
+
+function buildDebtPayModal(debt) {
+  return `
+  <div class="modal-bg show" id="debt-pay-modal-bg" onclick="if(event.target.id==='debt-pay-modal-bg') closeDebtPayModal()">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Registrar pago — ${debt.nombre}</div>
+      <div class="field">
+        <div class="field-label">Monto a registrar (COP)</div>
+        <input type="number" inputmode="numeric" id="debt-pay-amount" value="${Math.round(debt.cuotaMensual || 0)}">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button class="modal-submit" id="debt-pay-confirm" onclick="confirmDebtPayment()">${iconHtml("check")}Confirmar pago</button>
+        <button class="modal-delete" onclick="closeDebtPayModal()">${iconHtml("x")}Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function openDebtPayModal(debt) {
+  // If modal already exists, update and show
+  const existing = document.getElementById('debt-pay-modal-bg');
+  if (existing) existing.remove();
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = buildDebtPayModal(debt);
+  document.body.appendChild(wrapper.firstElementChild);
+  renderIcons();
+  // focus the input
+  setTimeout(() => {
+    const inp = document.getElementById('debt-pay-amount');
+    if (inp) inp.focus();
+  }, 50);
+}
+
+window.closeDebtPayModal = () => {
+  const el = document.getElementById('debt-pay-modal-bg');
+  if (el) el.remove();
+  _payingDebtId = null;
+};
+
+window.confirmDebtPayment = async () => {
+  const id = _payingDebtId;
+  if (!id) return closeDebtPayModal();
+  const debt = debtsState.find(d => d.id === id);
+  if (!debt) return closeDebtPayModal();
+  const raw = document.getElementById('debt-pay-amount')?.value;
+  if (!raw) { showToast('Monto inválido', true); return; }
+  const amount = parseFloat(String(raw).replace(/\./g, '').replace(/,/g, ''));
+  if (isNaN(amount) || amount <= 0) { showToast('Monto inválido', true); return; }
   const fecha = todayISO();
+  // close modal first to avoid UI blocking while awaiting network
+  closeDebtPayModal();
   await applyDebtPayment(debt, amount, fecha, false);
 };
 
