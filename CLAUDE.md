@@ -275,7 +275,7 @@ login con Google dispara el seed automático de los datos de la usuaria.
 - `firebase-config.js` contiene las claves del proyecto Firebase. En apps web de
   Firebase la `apiKey` es pública por diseño; la seguridad real depende de las
   **reglas de Firestore** (ver arriba), que restringen cada usuario a `users/{suUid}`.
-- Iconos PWA en `assets/icon-192.png` y `assets/icon-512.png` (wallet de Lucide sobre
+- Iconos PWA en `icon-192.png` y `icon-512.png` (wallet de Lucide sobre
   el gradiente esmeralda de marca, full-bleed → `purpose: "any maskable"`).
 - La app usa **solo Google Sign-In**. El dominio donde se publique (Netlify, GitHub
   Pages, `localhost`) debe estar en Firebase Console → Authentication → Settings →
