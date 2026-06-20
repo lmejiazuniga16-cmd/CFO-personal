@@ -879,36 +879,17 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
     <div id="debt-auto-fields" class="hide">
       <div class="field">
         <div class="field-label">Cuotas por mes</div>
-        <select id="debt-debitPaymentsPerMonth" onchange="toggleDebtAutoFields()">
-          <option value="1">1 cuota</option>
-          <option value="2">2 cuotas</option>
-        </select>
+        <input type="number" inputmode="numeric" id="debt-debitPaymentsPerMonth" min="1" max="31" placeholder="1" onchange="toggleDebtAutoFields()">
       </div>
       <div class="field">
         <div class="field-label">Fecha de inicio del débito automático</div>
         <input type="date" id="debt-debitStartDate">
       </div>
-      <div class="field">
-        <div class="field-label">Cuota 1: día del mes</div>
-        <input type="number" inputmode="numeric" id="debt-debitDay1" min="1" max="31" placeholder="1">
-      </div>
-      <div class="field">
-        <div class="field-label">Cuota 1: monto (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-debitAmount1" placeholder="0">
-      </div>
-      <div id="debt-split-row-2" class="hide">
-        <div class="field">
-          <div class="field-label">Cuota 2: día del mes</div>
-          <input type="number" inputmode="numeric" id="debt-debitDay2" min="1" max="31" placeholder="1">
-        </div>
-        <div class="field">
-          <div class="field-label">Cuota 2: monto (COP)</div>
-          <input type="number" inputmode="numeric" id="debt-debitAmount2" placeholder="0">
-        </div>
-      </div>
+      <div id="debt-debits-container"></div>
     </div>
     <button class="modal-submit" onclick="saveDebt()"><i data-lucide="check"></i>Guardar deuda</button>
-    <button class="modal-delete" onclick="closeDebtModal()"><i data-lucide="x"></i>Cerrar</button>
+    <button class="modal-delete" onclick="deleteDebt()"><i data-lucide="trash-2"></i>Eliminar deuda</button>
+    <button style="width:100%;background:transparent;color:var(--text-2);font-weight:600;padding:13px;border-radius:13px;font-size:14px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s;border:1px solid var(--line);" onclick="closeDebtModal()"><i data-lucide="x"></i>Cerrar</button>
   </div>
 </div>
 
