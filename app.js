@@ -524,6 +524,37 @@ function renderDebts() {
   renderIcons();
 }
 
+function renderTimeline() {
+  const el = document.getElementById("timeline");
+  if (!el) return;
+
+  const today = new Date(todayISO() + "T12:00:00");
+  const nextIndex = HITOS_TIMELINE.findIndex(item => !item.done && new Date(item.fecha + "T12:00:00") >= today);
+
+  el.innerHTML = HITOS_TIMELINE.map((item, index) => {
+    const itemDate = new Date(item.fecha + "T12:00:00");
+    const done = item.done || itemDate < today;
+    const now = !done && index === nextIndex;
+    const classes = ["tl-row"];
+    if (done) classes.push("done");
+    if (now) classes.push("now");
+
+    return `
+      <div class="${classes.join(" ")}">
+        <div class="tl-rail">
+          <div class="tl-node">${now ? iconHtml("star") : ""}</div>
+        </div>
+        <div class="tl-body">
+          <div class="tl-date">${item.fecha}</div>
+          <div class="tl-title">${item.label}</div>
+          <div class="tl-sub">${item.detalle}</div>
+          <div class="tl-gain">${iconHtml("trending-up")} ${item.monto}</div>
+        </div>
+      </div>`;
+  }).join("");
+  renderIcons();
+}
+
 // ============================================================
 // TRANSACCIONES — listener en tiempo real (esto es lo que
 // sincroniza celular y computador automáticamente)
