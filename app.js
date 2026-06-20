@@ -302,7 +302,7 @@ async function loadDebtsState(uid) {
   renderTimeline();
 }
 
-function openDebtModal(id) {
+window.openDebtModal = (id) => {
   editingDebtId = id;
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return;
@@ -315,11 +315,36 @@ function openDebtModal(id) {
   document.getElementById("debt-pago").value = debt.pago;
   document.getElementById("debt-automaticDebit").checked = Boolean(debt.automaticDebit);
   document.getElementById("debt-debitPaymentsPerMonth").value = debt.debitPaymentsPerMonth || 1;
-  document.getElementById("debt-debitDay1").value = debt.debitDay1 || 1;
-  document.getElementById("debt-debitAmount1").value = debt.debitAmount1 || debt.cuotaMensual || 0;
-  document.getElementById("debt-debitDay2").value = debt.debitDay2 || 1;
-  document.getElementById("debt-debitAmount2").value = debt.debitAmount2 || 0;
   document.getElementById("debt-debitStartDate").value = debt.debitStartDate || "";
+  
+  // Convertir datos viejos (debitDay1, debitAmount1, etc.) a nuevo formato (debits array)
+  let debits = debt.debits || [];
+  if (!debits || debits.length === 0) {
+    if (debt.debitDay1) {
+      debits = [];
+      if (debt.debitDay1) debits.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
+      if (debt.debitDay2) debits.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
+    }
+  }
+  
+  // Generar campos dinámicamente con los datos cargados
+  const container = document.getElementById("debt-debits-container");
+  let html = "";
+  for (let i = 0; i < debits.length; i++) {
+    const d = debits[i];
+    html += `
+      <div class="field">
+        <div class="field-label">Cuota ${i + 1}: día del mes</div>
+        <input type="number" inputmode="numeric" class="debt-debit-day" data-index="${i + 1}" min="1" max="31" value="${d.day || 1}">
+      </div>
+      <div class="field">
+        <div class="field-label">Cuota ${i + 1}: monto (COP)</div>
+        <input type="number" inputmode="numeric" class="debt-debit-amount" data-index="${i + 1}" value="${d.amount || 0}">
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+  
   toggleDebtAutoFields();
   document.getElementById("debt-modal-bg").classList.add("show");
   renderIcons();
@@ -328,8 +353,32 @@ function openDebtModal(id) {
 window.toggleDebtAutoFields = () => {
   const auto = document.getElementById("debt-automaticDebit").checked;
   document.getElementById("debt-auto-fields").classList.toggle("hide", !auto);
-  const payments = Number(document.getElementById("debt-debitPaymentsPerMonth").value);
-  document.getElementById("debt-split-row-2").classList.toggle("hide", payments !== 2);
+  
+  if (!auto) return;
+  
+  const payments = Number(document.getElementById("debt-debitPaymentsPerMonth").value) || 1;
+  const container = document.getElementById("debt-debits-container");
+  
+  if (payments <= 0) {
+    showToast("El número de cuotas debe ser mayor a 0", true);
+    return;
+  }
+  
+  let html = "";
+  for (let i = 1; i <= payments; i++) {
+    html += `
+      <div class="field">
+        <div class="field-label">Cuota ${i}: día del mes</div>
+        <input type="number" inputmode="numeric" class="debt-debit-day" data-index="${i}" min="1" max="31" placeholder="1">
+      </div>
+      <div class="field">
+        <div class="field-label">Cuota ${i}: monto (COP)</div>
+        <input type="number" inputmode="numeric" class="debt-debit-amount" data-index="${i}" placeholder="0">
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+  renderIcons();
 };
 
 window.saveDebt = async () => {
@@ -344,14 +393,29 @@ window.saveDebt = async () => {
   const pago = document.getElementById("debt-pago").value.trim();
   const automaticDebit = document.getElementById("debt-automaticDebit").checked;
   const debitPaymentsPerMonth = Number(document.getElementById("debt-debitPaymentsPerMonth").value);
-  const debitDay1 = Number(document.getElementById("debt-debitDay1").value);
-  const debitAmount1 = parseFloat(document.getElementById("debt-debitAmount1").value);
-  const debitDay2 = Number(document.getElementById("debt-debitDay2").value);
-  const debitAmount2 = parseFloat(document.getElementById("debt-debitAmount2").value);
   const debitStartDate = document.getElementById("debt-debitStartDate").value || null;
+  
+  // Recopilar datos de las cuotas dinámicas
+  let debits = [];
+  if (automaticDebit) {
+    const dayInputs = document.querySelectorAll(".debt-debit-day");
+    const amountInputs = document.querySelectorAll(".debt-debit-amount");
+    for (let i = 0; i < dayInputs.length; i++) {
+      const day = Number(dayInputs[i].value) || 1;
+      const amount = parseFloat(amountInputs[i].value) || 0;
+      if (day >= 1 && day <= 31 && amount > 0) {
+        debits.push({ day: Math.max(1, Math.min(31, day)), amount });
+      }
+    }
+  }
 
   if (!nombre || isNaN(saldo) || isNaN(cuotaMensual) || !pago) {
     showToast("Completa nombre, saldo, cuota mensual y pago", true);
+    return;
+  }
+  
+  if (automaticDebit && debits.length === 0) {
+    showToast("Define al menos una cuota con día y monto válidos", true);
     return;
   }
 
@@ -364,22 +428,10 @@ window.saveDebt = async () => {
     tasaEA: isNaN(tasaEA) ? debt.tasaEA : tasaEA,
     pago,
     automaticDebit,
-    debitPaymentsPerMonth: automaticDebit ? Math.max(1, Math.min(2, debitPaymentsPerMonth)) : 1,
-    debitDay1: automaticDebit ? Math.max(1, Math.min(31, debitDay1 || 1)) : 1,
-    debitAmount1: automaticDebit ? (isNaN(debitAmount1) ? cuotaMensual : debitAmount1) : 0,
-    debitDay2: automaticDebit && debitPaymentsPerMonth === 2 ? Math.max(1, Math.min(31, debitDay2 || 1)) : 0,
-    debitAmount2: automaticDebit && debitPaymentsPerMonth === 2 ? (isNaN(debitAmount2) ? 0 : debitAmount2) : 0,
-    debitStartDate,
+    debitPaymentsPerMonth: automaticDebit ? debits.length : 1,
+    debits: automaticDebit ? debits : [],
+    debitStartDate: automaticDebit ? debitStartDate : null,
   };
-
-  if (payload.automaticDebit && payload.debitPaymentsPerMonth === 2 && payload.debitAmount1 + payload.debitAmount2 === 0) {
-    showToast("Define montos para ambas cuotas", true);
-    return;
-  }
-  if (payload.automaticDebit && payload.debitPaymentsPerMonth === 1 && payload.debitAmount1 === 0) {
-    showToast("Define el monto de la cuota automática", true);
-    return;
-  }
 
   try {
     await setDoc(doc(db, "users", currentUser.uid, "debts", debt.id), payload);
@@ -395,20 +447,101 @@ window.closeDebtModal = () => {
   document.getElementById("debt-modal-bg").classList.remove("show");
 };
 
-window.registerDebtPayment = async (id) => {
+window.deleteDebt = async () => {
+  if (!currentUser || !editingDebtId) return;
+  if (!confirm("¿Eliminar esta deuda? Esta acción no se puede deshacer.")) return;
+  try {
+    await deleteDoc(doc(db, "users", currentUser.uid, "debts", editingDebtId));
+    showToast("Deuda eliminada");
+    closeDebtModal();
+    await loadDebtsState(currentUser.uid);
+  } catch (e) {
+    showToast("Error al eliminar deuda", true);
+  }
+};
+
+// Modal-based debt payment flow with type selector
+let _payingDebtId = null;
+let _paymentType = "monthly"; // 'monthly' or 'extra'
+window.registerDebtPayment = (id) => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return;
-  const defaultAmount = debt.cuotaMensual;
-  const answer = prompt(`Registro de pago mensual para "${debt.nombre}"
-Monto sugerido: ${fmt(defaultAmount)}
-Ingresa el monto abonado:`, String(defaultAmount));
-  if (!answer) return;
-  const amount = parseFloat(answer.replace(/\./g, "").replace(/,/g, ""));
-  if (isNaN(amount) || amount <= 0) {
-    showToast("Monto inválido", true);
-    return;
+  _payingDebtId = id;
+  _paymentType = "monthly";
+  openDebtPayModal(debt);
+};
+
+function buildDebtPayModal(debt) {
+  return `
+  <div class="modal-bg show" id="debt-pay-modal-bg" onclick="if(event.target.id==='debt-pay-modal-bg') closeDebtPayModal()">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Registrar pago — ${debt.nombre}</div>
+      <div class="seg" style="margin-bottom:18px;">
+        <button id="pay-type-monthly" class="active" onclick="setPaymentType('monthly')">${iconHtml("calendar")}Pago del mes</button>
+        <button id="pay-type-extra" onclick="setPaymentType('extra')">${iconHtml("plus")}Abono a capital</button>
+      </div>
+      <div class="field">
+        <div class="field-label">Monto (COP)</div>
+        <input type="number" inputmode="numeric" id="debt-pay-amount" value="${Math.round(debt.cuotaMensual || 0)}">
+      </div>
+      <div class="field">
+        <div class="field-label">Fecha</div>
+        <input type="date" id="debt-pay-date" value="${todayISO()}">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button class="modal-submit" id="debt-pay-confirm" onclick="confirmDebtPayment()">${iconHtml("check")}Confirmar</button>
+        <button class="modal-delete" onclick="closeDebtPayModal()">${iconHtml("x")}Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+window.setPaymentType = (type) => {
+  _paymentType = type;
+  document.getElementById('pay-type-monthly')?.classList.toggle('active', type === 'monthly');
+  document.getElementById('pay-type-extra')?.classList.toggle('active', type === 'extra');
+  const amountInput = document.getElementById('debt-pay-amount');
+  if (type === 'monthly' && _payingDebtId) {
+    const debt = debtsState.find(d => d.id === _payingDebtId);
+    if (debt) amountInput.value = Math.round(debt.cuotaMensual || 0);
+  } else if (type === 'extra') {
+    amountInput.value = '';
   }
-  const fecha = todayISO();
+};
+
+function openDebtPayModal(debt) {
+  // If modal already exists, update and show
+  const existing = document.getElementById('debt-pay-modal-bg');
+  if (existing) existing.remove();
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = buildDebtPayModal(debt);
+  document.body.appendChild(wrapper.firstElementChild);
+  renderIcons();
+  // focus the input
+  setTimeout(() => {
+    const inp = document.getElementById('debt-pay-amount');
+    if (inp) inp.focus();
+  }, 50);
+}
+
+window.closeDebtPayModal = () => {
+  const el = document.getElementById('debt-pay-modal-bg');
+  if (el) el.remove();
+  _payingDebtId = null;
+};
+
+window.confirmDebtPayment = async () => {
+  const id = _payingDebtId;
+  if (!id) return closeDebtPayModal();
+  const debt = debtsState.find(d => d.id === id);
+  if (!debt) return closeDebtPayModal();
+  const raw = document.getElementById('debt-pay-amount')?.value;
+  const fecha = document.getElementById('debt-pay-date')?.value || todayISO();
+  if (!raw) { showToast('Monto inválido', true); return; }
+  const amount = parseFloat(String(raw).replace(/\./g, '').replace(/,/g, ''));
+  if (isNaN(amount) || amount <= 0) { showToast('Monto inválido', true); return; }
+  closeDebtPayModal();
   await applyDebtPayment(debt, amount, fecha, false);
 };
 
@@ -424,11 +557,13 @@ async function applyDebtPayment(debt, amount, fecha, isAuto) {
   const updatedDebt = { ...debt, saldo: newSaldo, cuotasRestantes: newCuotas };
   if (isAuto) updatedDebt.lastAutoDebitRun = fecha;
   try {
+    const txDesc = isAuto ? "Débito automático" : (_paymentType === 'monthly' ? "Pago del mes" : "Abono a capital");
     await addDoc(collection(db, "users", currentUser.uid, "transactions"), {
       tipo: "expense",
       monto: payment,
-      descripcion: `${isAuto ? "Débito automático" : "Pago de deuda"} — ${debt.nombre}`,
+      descripcion: `${txDesc} — ${debt.nombre}`,
       categoria: "Deuda",
+      debtId: debt.id,
       fecha,
       creadoEn: serverTimestamp()
     });
@@ -464,9 +599,14 @@ async function processAutoDebits(uid) {
     while (cursor.getFullYear() < today.getFullYear() || cursor.getMonth() <= today.getMonth()) {
       const year = cursor.getFullYear();
       const month = cursor.getMonth();
-      const payments = [];
-      if (debt.debitPaymentsPerMonth >= 1 && debt.debitDay1) payments.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
-      if (debt.debitPaymentsPerMonth >= 2 && debt.debitDay2) payments.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
+      
+      // Usar el array dinámico debits, con fallback a formato viejo
+      let payments = debt.debits || [];
+      if (!payments || payments.length === 0) {
+        if (debt.debitDay1) payments.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
+        if (debt.debitDay2) payments.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
+      }
+      
       for (const p of payments) {
         if (!p.amount || p.amount <= 0) continue;
         const dueDay = Math.min(p.day, getLastDayOfMonth(year, month));
@@ -516,7 +656,7 @@ function renderDebts() {
       ${!d.abonoParcial ? `<div class="debt-locked">${iconHtml("lock")} No admite abono parcial — solo cuota mínima o saldo total</div>` : ''}
       <div class="debt-actions">
         <button class="debt-action" onclick="openDebtModal('${d.id}')">Editar</button>
-        ${!d.automaticDebit ? `<button class="debt-action secondary" onclick="registerDebtPayment('${d.id}')">Registrar pago del mes</button>` : ''}
+        ${d.automaticDebit ? `<button class="debt-action secondary" onclick="registerDebtPayment('${d.id}')">Registrar abono adicional</button>` : `<button class="debt-action secondary" onclick="registerDebtPayment('${d.id}')">Registrar pago o abono</button>`}
       </div>`;
     full.appendChild(card.cloneNode(true));
     if (preview.children.length < 2) preview.appendChild(card);
@@ -955,11 +1095,27 @@ window.submitTransaction = async () => {
   }
 };
 
-// Eliminar el movimiento que se está editando
+// Eliminar el movimiento que se está editando (con reversión de deuda si aplica)
 window.deleteTransaction = async () => {
   if (!editingTxId) return;
   if (!confirm("¿Eliminar este movimiento? No se puede deshacer.")) return;
   try {
+    // Obtener la transacción antes de eliminarla para revisar si es deuda
+    const txDoc = await getDoc(doc(db, "users", currentUser.uid, "transactions", editingTxId));
+    const tx = txDoc.data();
+    
+    // Si es una transacción de categoría "Deuda" con debtId, revertir el saldo
+    if (tx && tx.categoria === "Deuda" && tx.debtId) {
+      const debtRef = doc(db, "users", currentUser.uid, "debts", tx.debtId);
+      const debtDoc = await getDoc(debtRef);
+      const debt = debtDoc.data();
+      if (debt) {
+        const revertedSaldo = Math.min(debt.saldoOriginal, debt.saldo + tx.monto);
+        const newCuotas = Math.ceil(revertedSaldo / debt.cuotaMensual);
+        await setDoc(debtRef, { ...debt, saldo: revertedSaldo, cuotasRestantes: newCuotas }, { merge: true });
+      }
+    }
+    
     await deleteDoc(doc(db, "users", currentUser.uid, "transactions", editingTxId));
     document.getElementById("modal-bg").classList.remove("show");
     showToast("Movimiento eliminado");
