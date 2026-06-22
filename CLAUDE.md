@@ -149,6 +149,8 @@ eliminarlo (ver "Editar/eliminar movimientos" en Arquitectura).
   iconos Lucide (`ICON_CHOICES`).
 - Toasts de feedback: `showToast(msg, isError)`.
 - `initMoneyInput(input)` — helper que aplica formato automático de moneda colombiana (puntos de miles, coma decimal, prefijo `$`) a cualquier input numérico de monto. Llamar sobre cada input de monto al crearlo o inyectarlo en el DOM.
+- `openModal(type)` — abre el modal de registrar transacción recibiendo el tipo `'expense'` o `'income'` para preseleccionar la pestaña Gasto o Ingreso.
+- **Menú de acciones rápidas (FAB):** El botón flotante principal (`+`) despliega un menú vertical con tres opciones rápidas: **Gasto** (abre el modal en modo gasto), **Ingreso** (abre el modal en modo ingreso) y **Deuda** (abre `openDebtModal('nueva')` para crear una nueva deuda). Se colapsa al hacer clic en una opción o fuera del menú.
 
 
 ## Datos precargados (constantes en app.js)
