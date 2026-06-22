@@ -490,6 +490,25 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 #debt-section-auto input {
   color: var(--text);
 }
+.money-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.money-input-wrapper input {
+  padding-left: 24px !important;
+}
+.money-input-wrapper::before {
+  content: "$";
+  position: absolute;
+  left: 12px;
+  color: var(--text-2);
+  font-family: var(--f-mono);
+  font-weight: 600;
+  font-size: 14px;
+  pointer-events: none;
+}
 .pill-btn {
   background: transparent;
   border: none;

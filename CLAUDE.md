@@ -148,6 +148,8 @@ eliminarlo (ver "Editar/eliminar movimientos" en Arquitectura).
   mapa de iconos (`{ gasto, ingreso, iconos }`). El editor incluye un selector de
   iconos Lucide (`ICON_CHOICES`).
 - Toasts de feedback: `showToast(msg, isError)`.
+- `initMoneyInput(input)` — helper que aplica formato automático de moneda colombiana (puntos de miles, coma decimal, prefijo `$`) a cualquier input numérico de monto. Llamar sobre cada input de monto al crearlo o inyectarlo en el DOM.
+
 
 ## Datos precargados (constantes en app.js)
 

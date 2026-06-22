@@ -326,15 +326,15 @@ window.toggleDebtType = () => {
 };
 
 window.updateRefTotalAuto = () => {
-  const cap = parseFloat(document.getElementById("debt-refCapital").value) || 0;
-  const int = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
-  const seg = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
-  const otr = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+  const cap = parseFloat(document.getElementById("debt-refCapital").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const int = parseFloat(document.getElementById("debt-refIntereses-auto").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const seg = parseFloat(document.getElementById("debt-refSeguro").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const otr = parseFloat(document.getElementById("debt-refOtros").value.replace(/\./g, '').replace(',', '.')) || 0;
   
   let extraSum = 0;
   const extraRows = document.querySelectorAll(".ref-concepto-extra-value");
   extraRows.forEach(input => {
-    extraSum += parseFloat(input.value) || 0;
+    extraSum += parseFloat(input.value.replace(/\./g, '').replace(',', '.')) || 0;
   });
   
   const total = cap + int + seg + otr + extraSum;
@@ -346,8 +346,8 @@ window.updateRefTotalAuto = () => {
 };
 
 window.updateRefTotalTarjeta = () => {
-  const abono = parseFloat(document.getElementById("debt-refAbono").value) || 0;
-  const int = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value) || 0;
+  const abono = parseFloat(document.getElementById("debt-refAbono").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const int = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value.replace(/\./g, '').replace(',', '.')) || 0;
   const total = abono + int;
   document.getElementById("debt-refTotal-tarjeta").value = total;
 };
@@ -374,6 +374,9 @@ window.addRefConceptoExtraRow = (name = "", value = 0) => {
   
   container.appendChild(div);
   renderIcons();
+  if (typeof initMoneyInput === "function") {
+    initMoneyInput(div.querySelector(".ref-concepto-extra-value"));
+  }
   updateRefTotalAuto();
 };
 
@@ -470,10 +473,10 @@ window.openDebtModal = (id) => {
 
 function getRefConceptsList() {
   const list = [];
-  const cap = parseFloat(document.getElementById("debt-refCapital").value) || 0;
-  const int = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
-  const seg = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
-  const otr = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+  const cap = parseFloat(document.getElementById("debt-refCapital").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const int = parseFloat(document.getElementById("debt-refIntereses-auto").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const seg = parseFloat(document.getElementById("debt-refSeguro").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const otr = parseFloat(document.getElementById("debt-refOtros").value.replace(/\./g, '').replace(',', '.')) || 0;
   
   list.push({ nombre: "Abono a capital", valor: cap });
   list.push({ nombre: "Intereses corrientes", valor: int });
@@ -486,7 +489,7 @@ function getRefConceptsList() {
     const valInput = row.querySelector(".ref-concepto-extra-value");
     if (nameInput && valInput) {
       const name = nameInput.value.trim();
-      const val = parseFloat(valInput.value) || 0;
+      const val = parseFloat(valInput.value.replace(/\./g, '').replace(',', '.')) || 0;
       if (name) {
         list.push({ nombre: name, valor: val });
       }
@@ -520,7 +523,7 @@ function harvestDebitConfigFromDOM() {
       }
       data.concepts[cuotaIdx].push({
         nombre: name,
-        valor: parseFloat(input.value) || 0
+        valor: parseFloat(input.value.replace(/\./g, '').replace(',', '.')) || 0
       });
     }
   });
@@ -691,13 +694,23 @@ window.renderDebitCuotasConfig = (savedData = null) => {
   
   container.innerHTML = html;
   renderIcons();
+  container.querySelectorAll('.debit-concept-val').forEach(input => {
+    if (typeof initMoneyInput === "function") {
+      initMoneyInput(input);
+    }
+  });
+  container.querySelectorAll('[id^="debit-total-"]').forEach(input => {
+    if (typeof initMoneyInput === "function") {
+      initMoneyInput(input);
+    }
+  });
 };
 
 window.updateDebitTotal = (index) => {
   const rows = document.querySelectorAll(`.debit-concept-row[data-cuota-index="${index}"] .debit-concept-val`);
   let sum = 0;
   rows.forEach(r => {
-    sum += parseFloat(r.value) || 0;
+    sum += parseFloat(r.value.replace(/\./g, '').replace(',', '.')) || 0;
   });
   const totalInput = document.getElementById(`debit-total-${index}`);
   if (totalInput) {
@@ -735,7 +748,7 @@ window.saveDebt = async () => {
   
   const type = document.getElementById("debt-type").value;
   const nombre = document.getElementById("debt-name").value.trim();
-  const saldo = parseFloat(document.getElementById("debt-saldo").value);
+  const saldo = parseFloat(document.getElementById("debt-saldo").value.replace(/\./g, '').replace(',', '.')) || 0;
   const tasaEA = parseFloat(document.getElementById("debt-tasaEA").value);
   const pago = document.getElementById("debt-pago").value.trim();
   
@@ -797,7 +810,7 @@ window.saveDebt = async () => {
         const name = row.dataset.conceptName;
         const valInput = row.querySelector(".debit-concept-val");
         if (name && valInput) {
-          debitConcepts1.push({ nombre: name, valor: parseFloat(valInput.value) || 0 });
+          debitConcepts1.push({ nombre: name, valor: parseFloat(valInput.value.replace(/\./g, '').replace(',', '.')) || 0 });
         }
       });
       debitAmount1 = debitConcepts1.reduce((sum, c) => sum + c.valor, 0);
@@ -826,7 +839,7 @@ window.saveDebt = async () => {
           const name = row.dataset.conceptName;
           const valInput = row.querySelector(".debit-concept-val");
           if (name && valInput) {
-            concepts.push({ nombre: name, valor: parseFloat(valInput.value) || 0 });
+            concepts.push({ nombre: name, valor: parseFloat(valInput.value.replace(/\./g, '').replace(',', '.')) || 0 });
           }
         });
         const amount = concepts.reduce((sum, c) => sum + c.valor, 0);
@@ -873,10 +886,10 @@ window.saveDebt = async () => {
   payload.debitConcepts2 = automaticDebit ? debitConcepts2 : [];
   
   if (type === "automatico") {
-    const refCapital = parseFloat(document.getElementById("debt-refCapital").value) || 0;
-    const refIntereses = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
-    const refSeguro = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
-    const refOtros = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+    const refCapital = parseFloat(document.getElementById("debt-refCapital").value.replace(/\./g, '').replace(',', '.')) || 0;
+    const refIntereses = parseFloat(document.getElementById("debt-refIntereses-auto").value.replace(/\./g, '').replace(',', '.')) || 0;
+    const refSeguro = parseFloat(document.getElementById("debt-refSeguro").value.replace(/\./g, '').replace(',', '.')) || 0;
+    const refOtros = parseFloat(document.getElementById("debt-refOtros").value.replace(/\./g, '').replace(',', '.')) || 0;
     
     const refConceptosExtra = [];
     const extraRows = document.querySelectorAll(".ref-concepto-extra-row");
@@ -885,14 +898,14 @@ window.saveDebt = async () => {
       const valInput = row.querySelector(".ref-concepto-extra-value");
       if (nameInput && valInput) {
         const nombreExtra = nameInput.value.trim();
-        const valorExtra = parseFloat(valInput.value) || 0;
+        const valorExtra = parseFloat(valInput.value.replace(/\./g, '').replace(',', '.')) || 0;
         if (nombreExtra && valorExtra > 0) {
           refConceptosExtra.push({ nombre: nombreExtra, valor: valorExtra });
         }
       }
     });
     
-    const cuotaMensual = parseFloat(document.getElementById("debt-refTotal-auto").value) || 0;
+    const cuotaMensual = parseFloat(document.getElementById("debt-refTotal-auto").value.replace(/\./g, '').replace(',', '.')) || 0;
     const cuotasRestantes = parseInt(document.getElementById("debt-cuotas-auto").value, 10);
     const fechaFin = document.getElementById("debt-fechaFin-auto").value || null;
     
@@ -911,9 +924,9 @@ window.saveDebt = async () => {
     };
   } else {
     // Tarjeta
-    const refAbono = parseFloat(document.getElementById("debt-refAbono").value) || 0;
-    const refIntereses = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value) || 0;
-    const cuotaMensual = parseFloat(document.getElementById("debt-refTotal-tarjeta").value) || 0;
+    const refAbono = parseFloat(document.getElementById("debt-refAbono").value.replace(/\./g, '').replace(',', '.')) || 0;
+    const refIntereses = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value.replace(/\./g, '').replace(',', '.')) || 0;
+    const cuotaMensual = parseFloat(document.getElementById("debt-refTotal-tarjeta").value.replace(/\./g, '').replace(',', '.')) || 0;
     const cuotasRestantes = parseInt(document.getElementById("debt-cuotas-tarjeta").value, 10);
     const fechaFin = document.getElementById("debt-fechaFin-tarjeta").value || null;
     
@@ -2032,7 +2045,7 @@ window.setTxType = (type) => {
 };
 
 window.submitTransaction = async () => {
-  const monto = parseFloat(document.getElementById("tx-amount").value);
+  const monto = parseFloat(document.getElementById("tx-amount").value.replace(/\./g, '').replace(',', '.')) || 0;
   const descripcion = document.getElementById("tx-desc").value.trim();
   const categoria = document.getElementById("tx-category").value;
   const fecha = document.getElementById("tx-date").value || todayISO();
@@ -2276,7 +2289,7 @@ window.addNewCat = async () => {
 // SIMULADOR — "¿qué hago con esta plata?"
 // ============================================================
 window.runSimulation = () => {
-  const monto = parseFloat(document.getElementById("sim-amount").value);
+  const monto = parseFloat(document.getElementById("sim-amount").value.replace(/\./g, '').replace(',', '.')) || 0;
   const resultEl = document.getElementById("sim-result");
   if (!monto || monto <= 0) {
     showToast("Escribe un monto válido", true);
@@ -2326,3 +2339,233 @@ window.runSimulation = () => {
   resultEl.classList.add("show");
   renderIcons();
 };
+
+// ============================================================
+// MONEDA COLOMBIANA — FORMATO AUTOMÁTICO DE MONTOS
+// ============================================================
+function formatMoneyString(val) {
+  if (val === null || val === undefined) return "";
+  let cleanVal = String(val).replace(/[^\d,]/g, '');
+  let parts = cleanVal.split(',');
+  let integerPart = parts[0];
+  let decimalPart = parts.length > 1 ? parts.slice(1).join('').substring(0, 2) : null;
+  
+  if (integerPart.length > 1) {
+    integerPart = integerPart.replace(/^0+/, '');
+    if (integerPart === '') integerPart = '0';
+  } else if (integerPart.length === 0 && decimalPart !== null) {
+    integerPart = '0';
+  }
+  
+  let formattedInt = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return decimalPart !== null ? `${formattedInt},${decimalPart}` : formattedInt;
+}
+
+function getNewCursorPos(oldVal, newVal, oldCursorPos) {
+  let charsBeforeCursor = 0;
+  for (let i = 0; i < oldCursorPos; i++) {
+    if (/[\d,]/.test(oldVal[i])) {
+      charsBeforeCursor++;
+    }
+  }
+  
+  let newCursorPos = 0;
+  let charsSeen = 0;
+  while (newCursorPos < newVal.length && charsSeen < charsBeforeCursor) {
+    if (/[\d,]/.test(newVal[newCursorPos])) {
+      charsSeen++;
+    }
+    newCursorPos++;
+  }
+  return newCursorPos;
+}
+
+function isMoneyInput(input) {
+  if (!input) return false;
+  if (input.dataset.moneyInitialized) return false;
+  
+  const id = input.id;
+  const className = input.className;
+  
+  const moneyIds = [
+    "sim-amount",
+    "tx-amount",
+    "debt-saldo",
+    "debt-refCapital",
+    "debt-refIntereses-auto",
+    "debt-refSeguro",
+    "debt-refOtros",
+    "debt-refAbono",
+    "debt-refIntereses-tarjeta",
+    "tarjeta-pay-abono",
+    "tarjeta-pay-intereses",
+    "partial-pay-total",
+    "tarjeta-pay-total",
+    "debt-refTotal-auto",
+    "debt-refTotal-tarjeta"
+  ];
+  
+  const moneyClasses = [
+    "debit-concept-val",
+    "ref-concepto-extra-value",
+    "concept-amount"
+  ];
+  
+  if (moneyIds.includes(id)) return true;
+  for (let cls of moneyClasses) {
+    if (className.includes(cls)) return true;
+  }
+  return false;
+}
+
+window.initMoneyInput = (input) => {
+  if (!input) return;
+  
+  // Set type to text and inputmode to decimal
+  input.type = "text";
+  input.setAttribute("inputmode", "decimal");
+  
+  // Check if it's already wrapped
+  if (!input.parentNode.classList.contains("money-input-wrapper")) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "money-input-wrapper";
+    
+    // Transfer flex style
+    if (input.style.flex) {
+      wrapper.style.flex = input.style.flex;
+      input.style.flex = "1";
+    }
+    // Transfer width style
+    if (input.style.width) {
+      wrapper.style.width = input.style.width;
+      input.style.width = "100%";
+    }
+    
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+  }
+  
+  if (input.dataset.moneyInitialized) return;
+  input.dataset.moneyInitialized = "true";
+  
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  Object.defineProperty(input, 'value', {
+    get: function() {
+      let raw = descriptor.get.call(this);
+      if (!raw) return "";
+      return raw.replace(/\./g, '').replace(',', '.');
+    },
+    set: function(val) {
+      if (val === null || val === undefined) {
+        descriptor.set.call(this, "");
+        return;
+      }
+      let formatted = formatMoneyString(String(val));
+      descriptor.set.call(this, formatted);
+    },
+    configurable: true
+  });
+  
+  input.addEventListener('input', () => {
+    let oldVal = descriptor.get.call(input);
+    let oldCursor = input.selectionStart;
+    let formatted = formatMoneyString(oldVal);
+    let newCursor = getNewCursorPos(oldVal, formatted, oldCursor);
+    descriptor.set.call(input, formatted);
+    input.setSelectionRange(newCursor, newCursor);
+  });
+  
+  input.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    let cleanText = text.replace(/[^\d,]/g, '');
+    let formatted = formatMoneyString(cleanText);
+    
+    let start = input.selectionStart;
+    let end = input.selectionEnd;
+    let currentVal = descriptor.get.call(input);
+    
+    let newVal = currentVal.substring(0, start) + formatted + currentVal.substring(end);
+    let finalFormatted = formatMoneyString(newVal);
+    
+    let digitsInPasted = 0;
+    for (let i = 0; i < formatted.length; i++) {
+      if (/[\d,]/.test(formatted[i])) {
+        digitsInPasted++;
+      }
+    }
+    let digitsBeforePaste = 0;
+    for (let i = 0; i < start; i++) {
+      if (/[\d,]/.test(currentVal[i])) {
+        digitsBeforePaste++;
+      }
+    }
+    let totalDigitsBeforeCursor = digitsBeforePaste + digitsInPasted;
+    
+    descriptor.set.call(input, finalFormatted);
+    
+    let newCursorPos = 0;
+    let digitsSeen = 0;
+    while (newCursorPos < finalFormatted.length && digitsSeen < totalDigitsBeforeCursor) {
+      if (/[\d,]/.test(finalFormatted[newCursorPos])) {
+        digitsSeen++;
+      }
+      newCursorPos++;
+    }
+    
+    input.setSelectionRange(newCursorPos, newCursorPos);
+    input.dispatchEvent(new Event('input'));
+  });
+  
+  input.addEventListener('focus', () => {
+    setTimeout(() => {
+      input.select();
+    }, 50);
+  });
+  
+  input.addEventListener('blur', () => {
+    let val = descriptor.get.call(input);
+    if (!val) {
+      descriptor.set.call(input, "0");
+    } else {
+      if (val.endsWith(',')) {
+        val = val.substring(0, val.length - 1);
+      }
+      descriptor.set.call(input, formatMoneyString(val));
+    }
+    input.dispatchEvent(new Event('input'));
+  });
+  
+  let initial = descriptor.get.call(input);
+  if (initial) {
+    descriptor.set.call(input, formatMoneyString(initial));
+  }
+};
+
+// Inicialización de inputs existentes en carga de script
+document.querySelectorAll('input').forEach(input => {
+  if (isMoneyInput(input)) {
+    initMoneyInput(input);
+  }
+});
+
+// Observador para inicializar dinámicamente inputs futuros (modales, cuotas, etc.)
+const moneyObserver = new MutationObserver((mutations) => {
+  mutations.forEach(mutation => {
+    mutation.addedNodes.forEach(node => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.tagName === 'INPUT' && isMoneyInput(node)) {
+          initMoneyInput(node);
+        } else {
+          const inputs = node.querySelectorAll ? node.querySelectorAll('input') : [];
+          inputs.forEach(input => {
+            if (isMoneyInput(input)) {
+              initMoneyInput(input);
+            }
+          });
+        }
+      }
+    });
+  });
+});
+moneyObserver.observe(document.body, { childList: true, subtree: true });
