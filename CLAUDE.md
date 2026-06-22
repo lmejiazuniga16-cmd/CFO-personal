@@ -67,10 +67,10 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
 - **Datos:** Cloud Firestore. Todo cuelga de `users/{uid}/...`:
   - `users/{uid}/debts/{debtId}` — una deuda por documento. Campos: `id`, `nombre`, `saldo`,
     `saldoOriginal`, `cuotaMensual`, `tasaEA`, `cuotasRestantes`, `fechaFin`, `pago`,
-    `abonoParcial`, `automaticDebit`, `debitPaymentsPerMonth`, `debitDay1`, `debitAmount1`,
-    `debitDay2`, `debitAmount2`, `debitStartDate`, `lastAutoDebitRun`, `color`, `debtType`,
-    `refCapital`, `refIntereses`, `refSeguro`, `refOtros`, `refAbono`, `refConceptosExtra`,
-    `debitSameValues`, `debitConcepts1`, `debitConcepts2`.
+    `abonoParcial`, `automaticDebit`, `debitPaymentsPerMonth`, `debitStartDate`, `lastAutoDebitRun`,
+    `color`, `debtType`, `refCapital`, `refIntereses`, `refSeguro`, `refOtros`, `refAbono`,
+    `refConceptosExtra`, `debitSameValues`, y campos dinámicos indexados para cada cuota del mes
+    (de 1 a `debitPaymentsPerMonth`): `debitDayX`, `debitAmountX`, `debitDateX`, `debitConceptsX` (array de `{nombre, valor}`).
   - `users/{uid}/transactions/{autoId}` — cada gasto/ingreso registrado.
   - `users/{uid}/meta/ahorros`, `meta/perfil`, `meta/categorias` — documentos de configuración.
 - **Sincronización en vivo:** las transacciones se escuchan con `onSnapshot`
@@ -78,10 +78,10 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
   todos los dispositivos. El listener se guarda en `unsubTx` y se cancela al cerrar sesión.
 - **Gestión de deudas:**
   - **Deudas automáticas:** si `automaticDebit` es `true`, se procesan automáticamente
-    en las fechas y montos especificados (`debitDay1`/`debitAmount1` y opcionalmente
-    `debitDay2`/`debitAmount2` si `debitPaymentsPerMonth === 2`). Los débitos vencidos
-    se aplican al iniciar sesión con `processAutoDebits()`. Cada débito crea una
-    transacción de gasto de categoría "Deuda" y reduce el saldo automáticamente.
+    en las fechas y montos especificados en el array `debits` (que contiene las cuotas
+    configuradas en el mes: `day`, `amount`). Los débitos vencidos se aplican al iniciar
+    sesión con `processAutoDebits()`. Cada débito crea una transacción de gasto de
+    categoría "Deuda" y reduce el saldo automáticamente.
   - **Deudas manuales:** si `automaticDebit` es `false`, la usuaria ve un botón
     "Registrar pago o abono" en la tarjeta. Si la deuda admite abono parcial (`abonoParcial === true`),
     se abre un modal de desglose de conceptos quincenales/extraordinarios. Si no, se abre
@@ -190,16 +190,17 @@ Cada deuda es un documento con campos comunes y campos específicos del tipo:
   refAbono: 0,                      // abono mensual de referencia (solo tarjeta)
   // Campos de débito automático:
   automaticDebit: false,           // true = automática, false = manual
-  debitPaymentsPerMonth: 1,         // 1 o 2 cuotas al mes
-  debitSameValues: true,            // true = conceptos/valores iguales, false = diferentes
-  debitDay1: 1,                     // día del mes de la cuota 1
-  debitAmount1: 698886,             // monto de la cuota 1
-  debitDay2: 15,                    // día del mes de la cuota 2 (solo si hay 2)
-  debitAmount2: 0,                  // monto de la cuota 2
-  debitConcepts1: [],               // conceptos específicos de la cuota 1: array de {nombre, valor}
-  debitConcepts2: [],               // conceptos específicos de la cuota 2 (si aplica)
+  debitPaymentsPerMonth: 1,         // número entero de cuotas al mes (1, 2, 3, etc.)
+  debitSameValues: true,            // true = conceptos/valores iguales en todas las cuotas, false = diferentes
   debitStartDate: null,             // fecha de inicio (ISO YYYY-MM-DD)
-  lastAutoDebitRun: null            // fecha del último débito procesado
+  lastAutoDebitRun: null,           // fecha del último débito procesado
+  debits: [],                       // array de cuotas para el motor de pagos: [{day, amount}]
+  // Campos dinámicos indexados de 1 a debitPaymentsPerMonth:
+  debitDay1: 1,                     // día del mes de la cuota 1
+  debitAmount1: 698886,             // monto total de la cuota 1
+  debitDate1: "2026-06-01",         // fecha seleccionada para la cuota 1
+  debitConcepts1: [],               // desglose de conceptos para la cuota 1: array de {nombre, valor}
+  ...
 }
 ```
 

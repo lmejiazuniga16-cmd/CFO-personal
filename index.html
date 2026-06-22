@@ -486,8 +486,26 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 }
 .compact-field input, .compact-field select {
   padding: 9px 12px;
-  font-size: 14px;
+.pill-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
 }
+.pill-btn.active {
+  background: var(--brand) !important;
+  color: var(--brand-ink) !important;
+}
+
 .flex-row {
   display: flex;
   gap: 8px;
@@ -910,7 +928,7 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
       
       <!-- Apartado 1 — Información general -->
       <div class="form-section">
-        <div class="form-section-title">Apartado 1 — Información general</div>
+        <div class="form-section-title">Información general</div>
         
         <div class="field compact-field">
           <div class="field-label">Tipo de crédito</div>
@@ -943,7 +961,7 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
       
       <!-- Apartado 2 — Detalle del pago mensual (referencia) -->
       <div class="form-section" id="debt-section-ref">
-        <div class="form-section-title">Apartado 2 — Detalle del pago mensual (referencia)</div>
+        <div class="form-section-title">Detalle del pago mensual (referencia)</div>
         
         <!-- Vista Específica: automatico -->
         <div id="debt-ref-fields-automatico">
@@ -976,30 +994,6 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
           </div>
           
           <div class="field compact-field">
-            <div class="field-label">Número de cuotas de nómina al mes</div>
-            <select id="debt-paymentsMonth-auto" onchange="toggleRefPaymentsAuto()">
-              <option value="1">1 cuota</option>
-              <option value="2">2 cuotas</option>
-            </select>
-          </div>
-          
-          <!-- Contenedor cuota única / dos cuotas -->
-          <div class="field compact-field" id="debt-cuotaUnica-container">
-            <div class="field-label">Valor cuota única (COP)</div>
-            <input type="number" inputmode="numeric" id="debt-cuotaMensual-auto" placeholder="0">
-          </div>
-          <div id="debt-dosCuotas-container" class="hide">
-            <div class="field compact-field">
-              <div class="field-label">Valor cuota 1 (COP)</div>
-              <input type="number" inputmode="numeric" id="debt-debitAmount1-auto" placeholder="0">
-            </div>
-            <div class="field compact-field">
-              <div class="field-label">Valor cuota 2 (COP)</div>
-              <input type="number" inputmode="numeric" id="debt-debitAmount2-auto" placeholder="0">
-            </div>
-          </div>
-          
-          <div class="field compact-field">
             <div class="field-label">Cuotas restantes</div>
             <input type="number" inputmode="numeric" id="debt-cuotas-auto" placeholder="0">
           </div>
@@ -1024,14 +1018,6 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
             <input type="number" id="debt-refTotal-tarjeta" readonly style="background: var(--surface-2); color: var(--text-2); font-weight: bold;">
           </div>
           <div class="field compact-field">
-            <div class="field-label">Número de cuotas al mes</div>
-            <div style="background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; color: var(--text-2); font-size: 14px;">1 cuota (Fijo)</div>
-          </div>
-          <div class="field compact-field">
-            <div class="field-label">Valor cuota mensual sugerida (COP)</div>
-            <input type="number" id="debt-cuotaMensual-tarjeta" readonly style="background: var(--surface-2); color: var(--text-2); font-weight: bold;">
-          </div>
-          <div class="field compact-field">
             <div class="field-label">Cuotas restantes</div>
             <input type="number" inputmode="numeric" id="debt-cuotas-tarjeta" placeholder="0">
           </div>
@@ -1044,48 +1030,49 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
       
       <!-- Apartado 3 — Configuración de pago -->
       <div class="form-section">
-        <div class="form-section-title">Apartado 3 — Configuración de pago</div>
+        <div class="form-section-title">Configuración de pago</div>
         
         <div class="field compact-field" id="debt-abonoParcial-field-wrapper">
-          <label class="field-label" style="justify-content: flex-start; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="debt-abonoParcial" style="width: auto;"> ¿Permite abono parcial a capital?
-          </label>
+          <div class="field-label">¿Permite abono parcial a capital?</div>
+          <div class="seg" style="max-width: 160px; margin-top: 4px;">
+            <button type="button" id="btn-abonoParcial-yes" class="pill-btn" onclick="setAbonoParcial(true)">Sí</button>
+            <button type="button" id="btn-abonoParcial-no" class="pill-btn" onclick="setAbonoParcial(false)">No</button>
+          </div>
         </div>
         
         <div class="field compact-field">
-          <label class="field-label" style="justify-content: flex-start; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="debt-automaticDebit" onchange="toggleDebtAutoFields()" style="width: auto;"> ¿Tiene débito automático?
-          </label>
+          <div class="field-label">¿Tiene débito automático?</div>
+          <div class="seg" style="max-width: 160px; margin-top: 4px;">
+            <button type="button" id="btn-automaticDebit-yes" class="pill-btn" onclick="setAutomaticDebit(true)">Sí</button>
+            <button type="button" id="btn-automaticDebit-no" class="pill-btn" onclick="setAutomaticDebit(false)">No</button>
+          </div>
         </div>
       </div>
       
       <!-- Apartado 4 — Configuración de débito automático -->
       <div class="form-section hide" id="debt-section-auto">
-        <div class="form-section-title">Apartado 4 — Configuración de débito automático</div>
-        
-        <div class="field compact-field">
-          <div class="field-label">Fecha de inicio del débito (Opcional)</div>
-          <input type="date" id="debt-debitStartDate">
-        </div>
+        <div class="form-section-title">Débito automático</div>
         
         <div class="field compact-field">
           <div class="field-label">¿Cuántas cuotas se debitan al mes?</div>
-          <select id="debt-debitPaymentsPerMonth" onchange="handleDebitPaymentsPerMonthChange()">
-            <option value="1">1 cuota</option>
-            <option value="2">2 cuotas</option>
-          </select>
+          <input type="number" id="debt-debitPaymentsPerMonth" min="1" step="1" oninput="handleDebitPaymentsPerMonthChange()" placeholder="Ej: 1" style="font-family: var(--f-mono);">
         </div>
         
         <div class="field compact-field">
-          <div class="field-label">¿Los conceptos y valores son iguales en todas las cuotas del mes?</div>
-          <select id="debt-debitSameValues" onchange="handleSameValuesChange()">
-            <option value="true">Sí (Valores iguales)</option>
-            <option value="false">No (Valores diferentes)</option>
-          </select>
+          <div class="field-label">¿Los valores y conceptos son iguales en todas las cuotas?</div>
+          <div class="seg" style="max-width: 160px; margin-top: 4px;">
+            <button type="button" id="btn-debitSameValues-yes" class="pill-btn" onclick="setDebitSameValues(true)">Sí</button>
+            <button type="button" id="btn-debitSameValues-no" class="pill-btn" onclick="setDebitSameValues(false)">No</button>
+          </div>
         </div>
         
         <!-- Contenedor para la configuración de las cuotas del débito automático -->
         <div id="debt-debit-cuotas-config-container" style="margin-top: 12px;"></div>
+        
+        <div class="field compact-field" style="margin-top: 12px;">
+          <div class="field-label">Fecha de inicio del débito (Opcional)</div>
+          <input type="date" id="debt-debitStartDate">
+        </div>
       </div>
       
       <!-- Pie de página: botones de acción -->
