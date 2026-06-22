@@ -322,39 +322,29 @@ window.openDebtModal = (id) => {
   if (!debits || debits.length === 0) {
     if (debt.debitDay1) {
       debits = [];
-      if (debt.debitDay1) debits.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
+      debits.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
       if (debt.debitDay2) debits.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
     }
   }
   
-  // Generar campos dinámicamente con los datos cargados
-  const container = document.getElementById("debt-debits-container");
-  let html = "";
-  for (let i = 0; i < debits.length; i++) {
-    const d = debits[i];
-    html += `
-      <div class="field">
-        <div class="field-label">Cuota ${i + 1}: día del mes</div>
-        <input type="number" inputmode="numeric" class="debt-debit-day" data-index="${i + 1}" min="1" max="31" value="${d.day || 1}">
-      </div>
-      <div class="field">
-        <div class="field-label">Cuota ${i + 1}: monto (COP)</div>
-        <input type="number" inputmode="numeric" class="debt-debit-amount" data-index="${i + 1}" value="${d.amount || 0}">
-      </div>
-    `;
-  }
-  container.innerHTML = html;
-  
-  toggleDebtAutoFields();
+  toggleDebtAutoFields(debits);
   document.getElementById("debt-modal-bg").classList.add("show");
   renderIcons();
 }
 
-window.toggleDebtAutoFields = () => {
+window.toggleDebtAutoFields = (debitsToLoad) => {
   const auto = document.getElementById("debt-automaticDebit").checked;
-  document.getElementById("debt-auto-fields").classList.toggle("hide", !auto);
+  const debt = editingDebtId ? debtsState.find(d => d.id === editingDebtId) : null;
+  const isAbonoParcial = debt ? Boolean(debt.abonoParcial) : false;
   
-  if (!auto) return;
+  // Mostrar contenedor de campos si es debito automático o si admite abono parcial
+  const showFields = auto || isAbonoParcial;
+  document.getElementById("debt-auto-fields").classList.toggle("hide", !showFields);
+  
+  // Mostrar fecha de inicio de débito automático solo si es automático real
+  document.getElementById("debt-auto-start-date-field").classList.toggle("hide", !auto);
+  
+  if (!showFields) return;
   
   const payments = Number(document.getElementById("debt-debitPaymentsPerMonth").value) || 1;
   const container = document.getElementById("debt-debits-container");
@@ -364,16 +354,42 @@ window.toggleDebtAutoFields = () => {
     return;
   }
   
+  // Si no se pasaron cuotas cargadas, intentar obtenerlas de la deuda actual si el contenedor está vacío
+  if (!debitsToLoad && debt) {
+    debitsToLoad = debt.debits || [];
+    if ((!debitsToLoad || debitsToLoad.length === 0) && debt.debitDay1) {
+      debitsToLoad = [];
+      debitsToLoad.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
+      if (debt.debitDay2) debitsToLoad.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
+    }
+  }
+  
   let html = "";
   for (let i = 1; i <= payments; i++) {
+    let day = "";
+    let amount = "";
+    if (debitsToLoad && debitsToLoad[i - 1]) {
+      day = debitsToLoad[i - 1].day || "";
+      amount = debitsToLoad[i - 1].amount || "";
+    } else {
+      // Intentar preservar lo que el usuario ya digitó en el DOM antes de reconstruir
+      const existingDayInput = container.querySelector(`.debt-debit-day[data-index="${i}"]`);
+      const existingAmountInput = container.querySelector(`.debt-debit-amount[data-index="${i}"]`);
+      if (existingDayInput) day = existingDayInput.value;
+      if (existingAmountInput) amount = existingAmountInput.value;
+    }
+    
+    const labelPrefix = auto ? `Cuota ${i}` : `Quincena ${i}`;
+    const amountLabel = auto ? `monto (COP)` : `monto total a descontar (COP)`;
+    
     html += `
       <div class="field">
-        <div class="field-label">Cuota ${i}: día del mes</div>
-        <input type="number" inputmode="numeric" class="debt-debit-day" data-index="${i}" min="1" max="31" placeholder="1">
+        <div class="field-label">${labelPrefix}: día del mes</div>
+        <input type="number" inputmode="numeric" class="debt-debit-day" data-index="${i}" min="1" max="31" value="${day}" placeholder="1">
       </div>
       <div class="field">
-        <div class="field-label">Cuota ${i}: monto (COP)</div>
-        <input type="number" inputmode="numeric" class="debt-debit-amount" data-index="${i}" placeholder="0">
+        <div class="field-label">${labelPrefix}: ${amountLabel}</div>
+        <input type="number" inputmode="numeric" class="debt-debit-amount" data-index="${i}" value="${amount}" placeholder="0">
       </div>
     `;
   }
@@ -397,7 +413,8 @@ window.saveDebt = async () => {
   
   // Recopilar datos de las cuotas dinámicas
   let debits = [];
-  if (automaticDebit) {
+  const hasPaymentConfig = automaticDebit || debt.abonoParcial;
+  if (hasPaymentConfig) {
     const dayInputs = document.querySelectorAll(".debt-debit-day");
     const amountInputs = document.querySelectorAll(".debt-debit-amount");
     for (let i = 0; i < dayInputs.length; i++) {
@@ -428,9 +445,13 @@ window.saveDebt = async () => {
     tasaEA: isNaN(tasaEA) ? debt.tasaEA : tasaEA,
     pago,
     automaticDebit,
-    debitPaymentsPerMonth: automaticDebit ? debits.length : 1,
-    debits: automaticDebit ? debits : [],
+    debitPaymentsPerMonth: hasPaymentConfig ? debits.length : 1,
+    debits: hasPaymentConfig ? debits : [],
     debitStartDate: automaticDebit ? debitStartDate : null,
+    debitDay1: debits[0] ? debits[0].day : 0,
+    debitAmount1: debits[0] ? debits[0].amount : 0,
+    debitDay2: debits[1] ? debits[1].day : 0,
+    debitAmount2: debits[1] ? debits[1].amount : 0,
   };
 
   try {
@@ -463,6 +484,24 @@ window.deleteDebt = async () => {
 // Modal-based debt payment flow with type selector
 let _payingDebtId = null;
 let _paymentType = "monthly"; // 'monthly' or 'extra'
+
+function addMonthsToDate(date, months) {
+  const result = new Date(date);
+  const day = result.getDate();
+  result.setMonth(result.getMonth() + months);
+  if (result.getDate() !== day) {
+    result.setDate(0);
+  }
+  return result;
+}
+
+function formatISODate(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 window.registerDebtPayment = (id) => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return;
@@ -497,6 +536,282 @@ function buildDebtPayModal(debt) {
   </div>`;
 }
 
+function buildPartialDebtPayModal(debt) {
+  return `
+  <div class="modal-bg show" id="debt-pay-modal-bg" onclick="if(event.target.id==='debt-pay-modal-bg') closeDebtPayModal()">
+    <div class="modal" style="max-height: 90vh;">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Registrar pago quincenal — ${debt.nombre}</div>
+      
+      <div class="field">
+        <div class="field-label">Fecha del descuento</div>
+        <input type="date" id="partial-pay-date" value="${todayISO()}">
+      </div>
+      
+      <div class="field">
+        <div class="field-label">Quincena / Tipo pago</div>
+        <select id="partial-pay-quincena">
+          <option value="Quincena 1">Quincena 1</option>
+          <option value="Quincena 2">Quincena 2</option>
+          <option value="Abono Extraordinario">Abono Extraordinario</option>
+        </select>
+      </div>
+      
+      <div class="field">
+        <div class="field-label" style="margin-bottom: 8px;">Desglose de conceptos</div>
+        <div id="partial-pay-concepts-container" style="margin-bottom: 8px;"></div>
+        <button type="button" id="btn-add-concept" style="background: transparent; border: 1px dashed var(--line); color: var(--brand); font-weight: 600; padding: 10px; border-radius: 12px; font-size: 13px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px;">
+          ${iconHtml("plus")}Agregar otro concepto
+        </button>
+      </div>
+      
+      <div class="field">
+        <div class="field-label">Total descontado</div>
+        <input type="number" id="partial-pay-total" readonly style="background: var(--surface); color: var(--text-2); font-weight: bold;">
+      </div>
+      
+      <div class="field-label" style="margin-top: 15px; margin-bottom: 5px;">Resumen del pago</div>
+      <div id="partial-pay-summary" style="padding: 14px; background: var(--surface); border-radius: 12px; border: 1px solid var(--line); font-size: 13px; line-height: 1.6;">
+      </div>
+      
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="modal-submit" id="debt-pay-confirm" onclick="confirmPartialDebtPayment()">${iconHtml("check")}Confirmar</button>
+        <button class="modal-delete" onclick="closeDebtPayModal()">${iconHtml("x")}Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function addConceptRow(container, name = "", amount = "", isCapital = false) {
+  const row = document.createElement("div");
+  row.className = "concept-row";
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.gap = "8px";
+  row.style.marginBottom = "8px";
+  
+  row.innerHTML = `
+    <input type="text" class="concept-name" value="${name}" placeholder="Concepto" style="flex: 2; min-width: 0;" ${isCapital ? 'data-is-capital="true"' : ''}>
+    <input type="number" inputmode="numeric" class="concept-amount" value="${amount}" placeholder="0" style="flex: 1.5; min-width: 0;" required>
+    <button type="button" class="concept-delete-btn" style="background: transparent; border: none; color: var(--red); cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; visibility: ${isCapital ? 'hidden' : 'visible'};" title="Eliminar">${iconHtml("trash-2")}</button>
+  `;
+  
+  if (!isCapital) {
+    row.querySelector(".concept-delete-btn").addEventListener("click", () => {
+      row.remove();
+      updatePartialTotal();
+    });
+  }
+  
+  row.querySelector(".concept-amount").addEventListener("input", updatePartialTotal);
+  row.querySelector(".concept-name").addEventListener("input", updatePartialTotal);
+  
+  container.appendChild(row);
+  renderIcons();
+}
+
+function initPartialDebtPayModal(debt) {
+  const container = document.getElementById("partial-pay-concepts-container");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  addConceptRow(container, "Abono a capital", "", true);
+  addConceptRow(container, "Intereses corrientes", "", false);
+  addConceptRow(container, "Seguro vida deudor", "", false);
+  addConceptRow(container, "Otros conceptos", "", false);
+  
+  const dateInput = document.getElementById("partial-pay-date");
+  const quincenaSelect = document.getElementById("partial-pay-quincena");
+  
+  const updateQuincena = () => {
+    const dateVal = dateInput.value;
+    if (!dateVal) return;
+    const day = new Date(dateVal + "T12:00:00").getDate();
+    if (quincenaSelect.value !== "Abono Extraordinario") {
+      quincenaSelect.value = day <= 15 ? "Quincena 1" : "Quincena 2";
+    }
+  };
+  
+  updateQuincena();
+  
+  dateInput.addEventListener("change", () => {
+    updateQuincena();
+    updatePartialTotal();
+  });
+  
+  quincenaSelect.addEventListener("change", () => {
+    updatePartialTotal();
+  });
+  
+  const addBtn = document.getElementById("btn-add-concept");
+  if (addBtn) {
+    addBtn.onclick = () => {
+      addConceptRow(container, "", "", false);
+    };
+  }
+  
+  updatePartialTotal();
+}
+
+function updatePartialTotal() {
+  const container = document.getElementById("partial-pay-concepts-container");
+  if (!container) return;
+  
+  const rows = container.querySelectorAll(".concept-row");
+  let total = 0;
+  let capital = 0;
+  
+  rows.forEach(row => {
+    const amtInput = row.querySelector(".concept-amount");
+    const val = parseFloat(amtInput.value) || 0;
+    total += val;
+    
+    const nameInput = row.querySelector(".concept-name");
+    if (nameInput.hasAttribute("data-is-capital")) {
+      capital += val;
+    }
+  });
+  
+  const totalInput = document.getElementById("partial-pay-total");
+  if (totalInput) {
+    totalInput.value = total;
+  }
+  
+  const debt = debtsState.find(d => d.id === _payingDebtId);
+  if (!debt) return;
+  
+  const nuevoSaldo = Math.max(0, debt.saldo - capital);
+  const cuotaMensual = debt.cuotaMensual || 1;
+  const nuevasCuotas = Math.ceil(nuevoSaldo / cuotaMensual);
+  
+  const dateLimit = addMonthsToDate(new Date(), nuevasCuotas);
+  const nuevaFechaFin = formatISODate(dateLimit);
+  
+  const summaryEl = document.getElementById("partial-pay-summary");
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Gasto registrado:</span>
+        <strong style="color: var(--brand); font-family: var(--f-mono);">${fmt(total)}</strong>
+      </div>
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Abono a capital:</span>
+        <strong style="color: var(--gold); font-family: var(--f-mono);">${fmt(capital)}</strong>
+      </div>
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Nuevo saldo estimado:</span>
+        <strong style="font-family: var(--f-mono);">${fmt(nuevoSaldo)}</strong>
+      </div>
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Cuotas restantes:</span>
+        <strong style="font-family: var(--f-mono);">${nuevasCuotas} meses</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Fecha fin estimada:</span>
+        <strong style="font-family: var(--f-mono);">${nuevaFechaFin}</strong>
+      </div>
+    `;
+  }
+}
+
+window.confirmPartialDebtPayment = async () => {
+  const id = _payingDebtId;
+  if (!id) return closeDebtPayModal();
+  const debt = debtsState.find(d => d.id === id);
+  if (!debt) return closeDebtPayModal();
+  
+  const fecha = document.getElementById("partial-pay-date").value || todayISO();
+  const quincena = document.getElementById("partial-pay-quincena").value;
+  
+  const container = document.getElementById("partial-pay-concepts-container");
+  if (!container) return;
+  
+  const rows = container.querySelectorAll(".concept-row");
+  let total = 0;
+  let capital = 0;
+  let hasEmptyName = false;
+  let hasEmptyAmount = false;
+  let hasCapital = false;
+  
+  rows.forEach(row => {
+    const nameInput = row.querySelector(".concept-name");
+    const amtInput = row.querySelector(".concept-amount");
+    
+    const name = nameInput.value.trim();
+    const amtVal = parseFloat(amtInput.value);
+    
+    if (!name) hasEmptyName = true;
+    if (isNaN(amtVal) || amtVal < 0) hasEmptyAmount = true;
+    
+    total += amtVal || 0;
+    
+    if (nameInput.hasAttribute("data-is-capital")) {
+      hasCapital = true;
+      capital += amtVal || 0;
+    }
+  });
+  
+  if (!hasCapital) {
+    showToast("Debe existir el concepto 'Abono a capital'", true);
+    return;
+  }
+  if (hasEmptyName) {
+    showToast("Todos los conceptos deben tener un nombre", true);
+    return;
+  }
+  if (hasEmptyAmount) {
+    showToast("Los montos no pueden estar vacíos ni ser negativos", true);
+    return;
+  }
+  if (total <= 0) {
+    showToast("El monto total debe ser mayor a 0", true);
+    return;
+  }
+  
+  closeDebtPayModal();
+  
+  if (!currentUser) return;
+  
+  if (debt.saldo <= 0) {
+    showToast("La deuda ya está saldada", true);
+    return;
+  }
+  
+  const paymentCapital = Math.min(capital, debt.saldo);
+  const newSaldo = Math.max(0, debt.saldo - paymentCapital);
+  const cuotaMensual = debt.cuotaMensual || 1;
+  const newCuotas = Math.max(0, Math.ceil(newSaldo / cuotaMensual));
+  
+  const dateLimit = addMonthsToDate(new Date(), newCuotas);
+  const newFechaFin = formatISODate(dateLimit);
+  
+  const updatedDebt = {
+    ...debt,
+    saldo: newSaldo,
+    cuotasRestantes: newCuotas,
+    fechaFin: newFechaFin
+  };
+  
+  try {
+    await addDoc(collection(db, "users", currentUser.uid, "transactions"), {
+      tipo: "expense",
+      monto: total,
+      descripcion: `${debt.nombre} — ${quincena} — ${fecha}`,
+      categoria: "Deuda",
+      debtId: debt.id,
+      fecha,
+      creadoEn: serverTimestamp()
+    });
+    
+    await setDoc(doc(db, "users", currentUser.uid, "debts", debt.id), updatedDebt);
+    showToast("Pago quincenal guardado");
+    await loadDebtsState(currentUser.uid);
+  } catch (e) {
+    console.error(e);
+    showToast("Error al registrar pago quincenal", true);
+  }
+};
+
 window.setPaymentType = (type) => {
   _paymentType = type;
   document.getElementById('pay-type-monthly')?.classList.toggle('active', type === 'monthly');
@@ -511,18 +826,25 @@ window.setPaymentType = (type) => {
 };
 
 function openDebtPayModal(debt) {
-  // If modal already exists, update and show
   const existing = document.getElementById('debt-pay-modal-bg');
   if (existing) existing.remove();
   const wrapper = document.createElement('div');
-  wrapper.innerHTML = buildDebtPayModal(debt);
+  if (debt.abonoParcial) {
+    wrapper.innerHTML = buildPartialDebtPayModal(debt);
+  } else {
+    wrapper.innerHTML = buildDebtPayModal(debt);
+  }
   document.body.appendChild(wrapper.firstElementChild);
   renderIcons();
-  // focus the input
-  setTimeout(() => {
-    const inp = document.getElementById('debt-pay-amount');
-    if (inp) inp.focus();
-  }, 50);
+  
+  if (debt.abonoParcial) {
+    initPartialDebtPayModal(debt);
+  } else {
+    setTimeout(() => {
+      const inp = document.getElementById('debt-pay-amount');
+      if (inp) inp.focus();
+    }, 50);
+  }
 }
 
 window.closeDebtPayModal = () => {
