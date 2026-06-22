@@ -37,7 +37,8 @@ const DEUDAS_INICIALES = [
     debitAmount2: 0,
     debitStartDate: null,
     lastAutoDebitRun: null,
-    color: "blue"
+    color: "blue",
+    debtType: "automatico"
   },
   {
     id: "nubank-portatil",
@@ -58,7 +59,8 @@ const DEUDAS_INICIALES = [
     debitAmount2: 0,
     debitStartDate: null,
     lastAutoDebitRun: null,
-    color: "amber"
+    color: "amber",
+    debtType: "tarjeta"
   },
   {
     id: "nubank-dropshipping",
@@ -79,7 +81,8 @@ const DEUDAS_INICIALES = [
     debitAmount2: 0,
     debitStartDate: null,
     lastAutoDebitRun: null,
-    color: "amber"
+    color: "amber",
+    debtType: "tarjeta"
   }
 ];
 
@@ -296,28 +299,95 @@ async function loadDebtsState(uid) {
     await seedInitialData(uid);
     debtsState = JSON.parse(JSON.stringify(DEUDAS_INICIALES));
   } else {
-    debtsState = snap.docs.map(d => d.data());
+    debtsState = snap.docs.map(d => {
+      const data = d.data();
+      if (!data.debtType) {
+        data.debtType = "automatico";
+      }
+      return data;
+    });
   }
   renderDebts();
   renderTimeline();
 }
 
+window.toggleDebtType = () => {
+  const type = document.getElementById("debt-type").value;
+  const isAuto = type === "automatico";
+  document.getElementById("debt-fields-automatico").classList.toggle("hide", !isAuto);
+  document.getElementById("debt-fields-tarjeta").classList.toggle("hide", isAuto);
+  
+  toggleDebtAutoFields();
+};
+
+window.updateRefTotalAuto = () => {
+  const cap = parseFloat(document.getElementById("debt-refCapital").value) || 0;
+  const int = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
+  const seg = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
+  const otr = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+  document.getElementById("debt-refTotal-auto").value = cap + int + seg + otr;
+};
+
+window.updateRefTotalTarjeta = () => {
+  const abono = parseFloat(document.getElementById("debt-refAbono").value) || 0;
+  const int = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value) || 0;
+  document.getElementById("debt-refTotal-tarjeta").value = abono + int;
+};
+
+window.toggleRefPaymentsAuto = () => {
+  const val = Number(document.getElementById("debt-paymentsMonth-auto").value) || 1;
+  document.getElementById("debt-cuotaUnica-container").classList.toggle("hide", val !== 1);
+  document.getElementById("debt-dosCuotas-container").classList.toggle("hide", val !== 2);
+};
+
 window.openDebtModal = (id) => {
   editingDebtId = id;
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return;
+  
   document.getElementById("debt-modal-title").textContent = `Editar deuda`;
-  document.getElementById("debt-name").value = debt.nombre;
-  document.getElementById("debt-saldo").value = debt.saldo;
-  document.getElementById("debt-cuotas").value = debt.cuotasRestantes;
-  document.getElementById("debt-cuotaMensual").value = debt.cuotaMensual;
-  document.getElementById("debt-tasaEA").value = debt.tasaEA;
-  document.getElementById("debt-pago").value = debt.pago;
+  
+  const type = debt.debtType || "automatico";
+  document.getElementById("debt-type").value = type;
+  
+  // Common fields
+  document.getElementById("debt-name").value = debt.nombre || "";
+  document.getElementById("debt-saldo").value = debt.saldo || 0;
+  document.getElementById("debt-tasaEA").value = debt.tasaEA || 0;
+  document.getElementById("debt-pago").value = debt.pago || "";
+  document.getElementById("debt-color").value = debt.color || "blue";
   document.getElementById("debt-automaticDebit").checked = Boolean(debt.automaticDebit);
   document.getElementById("debt-debitPaymentsPerMonth").value = debt.debitPaymentsPerMonth || 1;
   document.getElementById("debt-debitStartDate").value = debt.debitStartDate || "";
   
-  // Convertir datos viejos (debitDay1, debitAmount1, etc.) a nuevo formato (debits array)
+  // Automatico specific
+  document.getElementById("debt-refCapital").value = debt.refCapital || "";
+  document.getElementById("debt-refIntereses-auto").value = debt.refIntereses || "";
+  document.getElementById("debt-refSeguro").value = debt.refSeguro || "";
+  document.getElementById("debt-refOtros").value = debt.refOtros || "";
+  
+  const paymentsMonthAuto = debt.debitPaymentsPerMonth === 2 ? 2 : 1;
+  document.getElementById("debt-paymentsMonth-auto").value = paymentsMonthAuto;
+  document.getElementById("debt-cuotaMensual-auto").value = debt.cuotaMensual || "";
+  document.getElementById("debt-debitAmount1-auto").value = debt.debitAmount1 || "";
+  document.getElementById("debt-debitAmount2-auto").value = debt.debitAmount2 || "";
+  document.getElementById("debt-abonoParcial").checked = Boolean(debt.abonoParcial);
+  document.getElementById("debt-cuotas-auto").value = debt.cuotasRestantes || "";
+  document.getElementById("debt-fechaFin-auto").value = debt.fechaFin || "";
+  
+  // Tarjeta specific
+  document.getElementById("debt-refAbono").value = debt.refAbono || "";
+  document.getElementById("debt-refIntereses-tarjeta").value = debt.refIntereses || "";
+  document.getElementById("debt-cuotaMensual-tarjeta").value = debt.cuotaMensual || "";
+  document.getElementById("debt-cuotas-tarjeta").value = debt.cuotasRestantes || "";
+  document.getElementById("debt-fechaFin-tarjeta").value = debt.fechaFin || "";
+  
+  // Run toggles and calculations
+  toggleDebtType();
+  toggleRefPaymentsAuto();
+  updateRefTotalAuto();
+  updateRefTotalTarjeta();
+  
   let debits = debt.debits || [];
   if (!debits || debits.length === 0) {
     if (debt.debitDay1) {
@@ -328,6 +398,7 @@ window.openDebtModal = (id) => {
   }
   
   toggleDebtAutoFields(debits);
+  
   document.getElementById("debt-modal-bg").classList.add("show");
   renderIcons();
 }
@@ -401,19 +472,25 @@ window.saveDebt = async () => {
   if (!currentUser || !editingDebtId) return;
   const debt = debtsState.find(d => d.id === editingDebtId);
   if (!debt) return;
+  
+  const type = document.getElementById("debt-type").value;
   const nombre = document.getElementById("debt-name").value.trim();
   const saldo = parseFloat(document.getElementById("debt-saldo").value);
-  const cuotasRestantes = parseInt(document.getElementById("debt-cuotas").value, 10);
-  const cuotaMensual = parseFloat(document.getElementById("debt-cuotaMensual").value);
   const tasaEA = parseFloat(document.getElementById("debt-tasaEA").value);
   const pago = document.getElementById("debt-pago").value.trim();
+  const color = document.getElementById("debt-color").value;
   const automaticDebit = document.getElementById("debt-automaticDebit").checked;
   const debitPaymentsPerMonth = Number(document.getElementById("debt-debitPaymentsPerMonth").value);
   const debitStartDate = document.getElementById("debt-debitStartDate").value || null;
   
-  // Recopilar datos de las cuotas dinámicas
+  if (!nombre || isNaN(saldo) || !pago) {
+    showToast("Completa nombre, saldo y descripción de pago", true);
+    return;
+  }
+  
+  // Recopilar datos de las cuotas dinámicas de débito automático si aplica
   let debits = [];
-  const hasPaymentConfig = automaticDebit || debt.abonoParcial;
+  const hasPaymentConfig = automaticDebit || (type === "automatico" && debt.abonoParcial);
   if (hasPaymentConfig) {
     const dayInputs = document.querySelectorAll(".debt-debit-day");
     const amountInputs = document.querySelectorAll(".debt-debit-amount");
@@ -425,34 +502,91 @@ window.saveDebt = async () => {
       }
     }
   }
-
-  if (!nombre || isNaN(saldo) || isNaN(cuotaMensual) || !pago) {
-    showToast("Completa nombre, saldo, cuota mensual y pago", true);
-    return;
-  }
   
   if (automaticDebit && debits.length === 0) {
-    showToast("Define al menos una cuota con día y monto válidos", true);
+    showToast("Define al menos una cuota de débito automático con día y monto válidos", true);
     return;
   }
 
-  const payload = {
+  let payload = {
     ...debt,
     nombre,
     saldo,
-    cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / cuotaMensual)) : cuotasRestantes,
-    cuotaMensual,
     tasaEA: isNaN(tasaEA) ? debt.tasaEA : tasaEA,
     pago,
+    color,
+    debtType: type,
     automaticDebit,
-    debitPaymentsPerMonth: hasPaymentConfig ? debits.length : 1,
-    debits: hasPaymentConfig ? debits : [],
+    debitPaymentsPerMonth: automaticDebit ? debits.length : 1,
+    debits: automaticDebit ? debits : [],
     debitStartDate: automaticDebit ? debitStartDate : null,
     debitDay1: debits[0] ? debits[0].day : 0,
     debitAmount1: debits[0] ? debits[0].amount : 0,
     debitDay2: debits[1] ? debits[1].day : 0,
     debitAmount2: debits[1] ? debits[1].amount : 0,
   };
+
+  if (type === "automatico") {
+    const refCapital = parseFloat(document.getElementById("debt-refCapital").value) || 0;
+    const refIntereses = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
+    const refSeguro = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
+    const refOtros = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+    
+    const numPayments = Number(document.getElementById("debt-paymentsMonth-auto").value) || 1;
+    const abonoParcial = document.getElementById("debt-abonoParcial").checked;
+    const cuotasRestantes = parseInt(document.getElementById("debt-cuotas-auto").value, 10);
+    const fechaFin = document.getElementById("debt-fechaFin-auto").value || null;
+    
+    let cuotaMensual = 0;
+    let debitAmount1 = 0;
+    let debitAmount2 = 0;
+    
+    if (numPayments === 2) {
+      debitAmount1 = parseFloat(document.getElementById("debt-debitAmount1-auto").value) || 0;
+      debitAmount2 = parseFloat(document.getElementById("debt-debitAmount2-auto").value) || 0;
+      cuotaMensual = debitAmount1 + debitAmount2;
+    } else {
+      cuotaMensual = parseFloat(document.getElementById("debt-cuotaMensual-auto").value) || 0;
+      debitAmount1 = cuotaMensual;
+      debitAmount2 = 0;
+    }
+    
+    payload = {
+      ...payload,
+      refCapital,
+      refIntereses,
+      refSeguro,
+      refOtros,
+      refAbono: 0,
+      abonoParcial,
+      debitPaymentsPerMonth: numPayments,
+      cuotaMensual,
+      debitAmount1,
+      debitAmount2,
+      cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / cuotaMensual)) : cuotasRestantes,
+      fechaFin,
+    };
+  } else {
+    // tarjeta
+    const refAbono = parseFloat(document.getElementById("debt-refAbono").value) || 0;
+    const refIntereses = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value) || 0;
+    const cuotaMensual = parseFloat(document.getElementById("debt-cuotaMensual-tarjeta").value) || 0;
+    const cuotasRestantes = parseInt(document.getElementById("debt-cuotas-tarjeta").value, 10);
+    const fechaFin = document.getElementById("debt-fechaFin-tarjeta").value || null;
+    
+    payload = {
+      ...payload,
+      refAbono,
+      refIntereses,
+      refCapital: 0,
+      refSeguro: 0,
+      refOtros: 0,
+      abonoParcial: false,
+      cuotaMensual,
+      cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / cuotaMensual)) : cuotasRestantes,
+      fechaFin,
+    };
+  }
 
   try {
     await setDoc(doc(db, "users", currentUser.uid, "debts", debt.id), payload);
@@ -462,7 +596,7 @@ window.saveDebt = async () => {
   } catch (e) {
     showToast("Error al guardar deuda", true);
   }
-};
+};;
 
 window.closeDebtModal = () => {
   document.getElementById("debt-modal-bg").classList.remove("show");
@@ -506,8 +640,174 @@ window.registerDebtPayment = (id) => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return;
   _payingDebtId = id;
-  _paymentType = "monthly";
-  openDebtPayModal(debt);
+  
+  const type = debt.debtType || "automatico";
+  if (type === "tarjeta") {
+    openTarjetaPayModal(id);
+  } else {
+    _paymentType = "monthly";
+    openDebtPayModal(debt);
+  }
+};
+
+window.openTarjetaPayModal = (id) => {
+  const debt = debtsState.find(d => d.id === id);
+  if (!debt) return;
+  _payingDebtId = id;
+  
+  const existing = document.getElementById('debt-pay-modal-bg');
+  if (existing) existing.remove();
+  
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `
+  <div class="modal-bg show" id="debt-pay-modal-bg" onclick="if(event.target.id==='debt-pay-modal-bg') closeDebtPayModal()">
+    <div class="modal" style="max-height: 90vh;">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Registrar pago TC — ${debt.nombre}</div>
+      
+      <div class="field">
+        <div class="field-label">Fecha del pago</div>
+        <input type="date" id="tarjeta-pay-date" value="${todayISO()}" onchange="updateTarjetaPaySummary()">
+      </div>
+      
+      <div class="field">
+        <div class="field-label">Abono a la deuda (COP)</div>
+        <input type="number" inputmode="numeric" id="tarjeta-pay-abono" value="${debt.refAbono || ''}" oninput="updateTarjetaPaySummary()" placeholder="0">
+      </div>
+      
+      <div class="field">
+        <div class="field-label">Intereses (COP)</div>
+        <input type="number" inputmode="numeric" id="tarjeta-pay-intereses" value="${debt.refIntereses || ''}" oninput="updateTarjetaPaySummary()" placeholder="0">
+      </div>
+      
+      <div class="field">
+        <div class="field-label">Total</div>
+        <input type="number" id="tarjeta-pay-total" readonly style="background: var(--surface); color: var(--text-2); font-weight: bold;">
+      </div>
+      
+      <div class="field-label" style="margin-top: 15px; margin-bottom: 5px;">Resumen del pago</div>
+      <div id="tarjeta-pay-summary" style="padding: 14px; background: var(--surface); border-radius: 12px; border: 1px solid var(--line); font-size: 13px; line-height: 1.6;">
+      </div>
+      
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="modal-submit" id="debt-pay-confirm" onclick="confirmTarjetaPayment()">${iconHtml("check")}Confirmar</button>
+        <button class="modal-delete" onclick="closeDebtPayModal()">${iconHtml("x")}Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+  
+  document.body.appendChild(wrapper.firstElementChild);
+  renderIcons();
+  
+  updateTarjetaPaySummary();
+};
+
+window.updateTarjetaPaySummary = () => {
+  const abono = parseFloat(document.getElementById("tarjeta-pay-abono").value) || 0;
+  const intereses = parseFloat(document.getElementById("tarjeta-pay-intereses").value) || 0;
+  const total = abono + intereses;
+  
+  document.getElementById("tarjeta-pay-total").value = total;
+  
+  const debt = debtsState.find(d => d.id === _payingDebtId);
+  if (!debt) return;
+  
+  const nuevoSaldo = Math.max(0, debt.saldo - abono);
+  const cuotaMensual = debt.cuotaMensual || 1;
+  const nuevasCuotas = Math.ceil(nuevoSaldo / cuotaMensual);
+  
+  const dateLimit = addMonthsToDate(new Date(), nuevasCuotas);
+  const nuevaFechaFin = formatISODate(dateLimit);
+  
+  const summaryEl = document.getElementById("tarjeta-pay-summary");
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Gasto registrado:</span>
+        <strong style="color: var(--brand); font-family: var(--f-mono);">${fmt(total)}</strong>
+      </div>
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Abono al saldo:</span>
+        <strong style="color: var(--gold); font-family: var(--f-mono);">${fmt(abono)}</strong>
+      </div>
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Nuevo saldo estimado:</span>
+        <strong style="font-family: var(--f-mono);">${fmt(nuevoSaldo)}</strong>
+      </div>
+      <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Cuotas restantes:</span>
+        <strong style="font-family: var(--f-mono);">${nuevasCuotas} meses</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-2);">Fecha fin estimada:</span>
+        <strong style="font-family: var(--f-mono);">${nuevaFechaFin}</strong>
+      </div>
+    `;
+  }
+};
+
+window.confirmTarjetaPayment = async () => {
+  const id = _payingDebtId;
+  if (!id) return closeDebtPayModal();
+  const debt = debtsState.find(d => d.id === id);
+  if (!debt) return closeDebtPayModal();
+  
+  const fecha = document.getElementById("tarjeta-pay-date").value || todayISO();
+  const abono = parseFloat(document.getElementById("tarjeta-pay-abono").value);
+  const intereses = parseFloat(document.getElementById("tarjeta-pay-intereses").value);
+  
+  if (isNaN(abono) || abono < 0 || isNaN(intereses) || intereses < 0) {
+    showToast("Los montos no pueden estar vacíos ni ser negativos", true);
+    return;
+  }
+  
+  const total = abono + intereses;
+  if (total <= 0) {
+    showToast("El monto total debe ser mayor a 0", true);
+    return;
+  }
+  
+  closeDebtPayModal();
+  
+  if (!currentUser) return;
+  if (debt.saldo <= 0) {
+    showToast("La deuda ya está saldada", true);
+    return;
+  }
+  
+  const paymentAbono = Math.min(abono, debt.saldo);
+  const newSaldo = Math.max(0, debt.saldo - paymentAbono);
+  const cuotaMensual = debt.cuotaMensual || 1;
+  const newCuotas = Math.max(0, Math.ceil(newSaldo / cuotaMensual));
+  
+  const dateLimit = addMonthsToDate(new Date(), newCuotas);
+  const newFechaFin = formatISODate(dateLimit);
+  
+  const updatedDebt = {
+    ...debt,
+    saldo: newSaldo,
+    cuotasRestantes: newCuotas,
+    fechaFin: newFechaFin
+  };
+  
+  try {
+    await addDoc(collection(db, "users", currentUser.uid, "transactions"), {
+      tipo: "expense",
+      monto: total,
+      descripcion: `${debt.nombre} — ${fecha}`,
+      categoria: "Deuda",
+      debtId: debt.id,
+      fecha,
+      creadoEn: serverTimestamp()
+    });
+    
+    await setDoc(doc(db, "users", currentUser.uid, "debts", debt.id), updatedDebt);
+    showToast("Pago de TC guardado");
+    await loadDebtsState(currentUser.uid);
+  } catch (e) {
+    console.error(e);
+    showToast("Error al registrar pago de TC", true);
+  }
 };
 
 function buildDebtPayModal(debt) {
@@ -615,10 +915,10 @@ function initPartialDebtPayModal(debt) {
   if (!container) return;
   
   container.innerHTML = "";
-  addConceptRow(container, "Abono a capital", "", true);
-  addConceptRow(container, "Intereses corrientes", "", false);
-  addConceptRow(container, "Seguro vida deudor", "", false);
-  addConceptRow(container, "Otros conceptos", "", false);
+  addConceptRow(container, "Abono a capital", debt.refCapital || "", true);
+  addConceptRow(container, "Intereses corrientes", debt.refIntereses || "", false);
+  addConceptRow(container, "Seguro vida deudor", debt.refSeguro || "", false);
+  addConceptRow(container, "Otros conceptos", debt.refOtros || "", false);
   
   const dateInput = document.getElementById("partial-pay-date");
   const quincenaSelect = document.getElementById("partial-pay-quincena");
@@ -978,7 +1278,7 @@ function renderDebts() {
       ${!d.abonoParcial ? `<div class="debt-locked">${iconHtml("lock")} No admite abono parcial — solo cuota mínima o saldo total</div>` : ''}
       <div class="debt-actions">
         <button class="debt-action" onclick="openDebtModal('${d.id}')">Editar</button>
-        ${d.automaticDebit ? `<button class="debt-action secondary" onclick="registerDebtPayment('${d.id}')">Registrar abono adicional</button>` : `<button class="debt-action secondary" onclick="registerDebtPayment('${d.id}')">Registrar pago o abono</button>`}
+        <button class="debt-action secondary" onclick="registerDebtPayment('${d.id}')">Registrar pago o abono</button>
       </div>`;
     full.appendChild(card.cloneNode(true));
     if (preview.children.length < 2) preview.appendChild(card);

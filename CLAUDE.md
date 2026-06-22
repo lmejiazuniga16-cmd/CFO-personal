@@ -68,7 +68,8 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
   - `users/{uid}/debts/{debtId}` — una deuda por documento. Campos: `id`, `nombre`, `saldo`,
     `saldoOriginal`, `cuotaMensual`, `tasaEA`, `cuotasRestantes`, `fechaFin`, `pago`,
     `abonoParcial`, `automaticDebit`, `debitPaymentsPerMonth`, `debitDay1`, `debitAmount1`,
-    `debitDay2`, `debitAmount2`, `debitStartDate`, `lastAutoDebitRun`, `color`.
+    `debitDay2`, `debitAmount2`, `debitStartDate`, `lastAutoDebitRun`, `color`, `debtType`,
+    `refCapital`, `refIntereses`, `refSeguro`, `refOtros`, `refAbono`.
   - `users/{uid}/transactions/{autoId}` — cada gasto/ingreso registrado.
   - `users/{uid}/meta/ahorros`, `meta/perfil`, `meta/categorias` — documentos de configuración.
 - **Sincronización en vivo:** las transacciones se escuchan con `onSnapshot`
@@ -179,6 +180,12 @@ Cada deuda es un documento con campos comunes y campos específicos del tipo:
   pago: "Nómina automática",
   abonoParcial: true,
   color: "blue",
+  debtType: "automatico",           // "automatico" (Libranza) o "tarjeta" (TC)
+  refCapital: 0,                    // abono capital mensual de referencia (solo automatico)
+  refIntereses: 0,                  // intereses mensuales de referencia
+  refSeguro: 0,                     // seguro vida de referencia (solo automatico)
+  refOtros: 0,                      // otros conceptos de referencia (solo automatico)
+  refAbono: 0,                      // abono mensual de referencia (solo tarjeta)
   // Campos de débito automático:
   automaticDebit: false,           // true = automática, false = manual
   debitPaymentsPerMonth: 1,         // 1 o 2 cuotas al mes
@@ -213,13 +220,13 @@ Cada deuda es un documento con campos comunes y campos específicos del tipo:
 
 1. **Registro:** la usuaria hace clic en "Registrar pago o abono" en la tarjeta de la deuda (`registerDebtPayment`).
 2. **Modal de pago:**
-   - Si la deuda no admite abono parcial (`abonoParcial: false`, ej. Nubank), se abre el modal simple para registrar el pago mensual o abono extra.
-   - Si admite abono parcial (`abonoParcial: true`, ej. Libranza), se abre el modal quincenal por conceptos (`buildPartialDebtPayModal`).
+   - **Caso Tarjetas de Crédito (`debtType === "tarjeta"`)**: Se abre el modal de tarjetas (`openTarjetaPayModal`) precargado con `refAbono` y `refIntereses`. Al confirmar (`confirmTarjetaPayment`), se registra una transacción por el total (abono + intereses) y se resta solo el `abono a la deuda` del saldo.
+   - **Caso Crédito Automático (`debtType === "automatico"`)**: Se abre el modal quincenal por conceptos (`buildPartialDebtPayModal`) precargado con los valores de referencia (`refCapital`, `refIntereses`, `refSeguro`, `refOtros`). Al confirmar (`confirmPartialDebtPayment`), se registra la transacción por el total y se resta solo el `abono a capital` del saldo.
 3. **Modal de conceptos (Libranza/Abono Parcial):**
-   - Inicializa 4 conceptos ("Abono a capital", "Intereses corrientes", "Seguro vida deudor" y "Otros conceptos") y permite agregar/eliminar conceptos.
+   - Inicializa los conceptos y permite agregar/eliminar conceptos.
    - Selecciona por defecto "Quincena 1" o "Quincena 2" según la fecha elegida (1-15 vs 16+), o "Abono Extraordinario" si se requiere.
    - Calcula el total y simula el impacto en saldo, cuotas restantes y fecha de fin en tiempo real.
-4. **Confirmación:** `confirmPartialDebtPayment()` registra la transacción de gasto con el total de conceptos, actualiza el saldo reduciendo *únicamente* el "Abono a capital", recalcula las cuotas restantes estimadas (`Math.ceil(nuevoSaldo / cuotaMensual)`) y la nueva fecha de fin (`addMonthsToDate` desde hoy), y actualiza Firestore.
+4. **Confirmación:** Registra la transacción de gasto con el total de conceptos, actualiza el saldo reduciendo *únicamente* el abono asignado a capital, recalcula las cuotas restantes estimadas y la nueva fecha de fin (`addMonthsToDate` desde hoy), y actualiza Firestore.
 
 ### Edición de una deuda existente
 
