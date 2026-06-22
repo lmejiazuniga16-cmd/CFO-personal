@@ -86,12 +86,41 @@ const DEUDAS_INICIALES = [
   }
 ];
 
+const todayISO = () => new Date().toISOString().split("T")[0];
+
 const AHORROS_INICIALES = {
-  cesantias: { nombre: "Cesantías (Porvenir)", valor: 7869004, estado: "Inmovilizado — subsidio vivienda. NO TOCAR." },
-  fondoPermanente: { nombre: "Ahorro permanente Fondo de Occidente", valor: 5538123, estado: "Inmovilizado — retiro solo al salir de la empresa" },
-  dale: { nombre: "Cuenta DALE", valor: 1095539, estado: "Disponible — renta 10,5% EA" },
-  efectivo: { nombre: "Efectivo", valor: 20000, estado: "Disponible" }
+  ahorros: [
+    {
+      id: "cesantias",
+      nombre: "Cesantías (Porvenir)",
+      descripcion: "Intocable — subsidio vivienda",
+      valor: 7869004,
+      ultimaActualizacion: todayISO()
+    },
+    {
+      id: "fondoPermanente",
+      nombre: "Ahorro permanente Fondo de Occidente",
+      descripcion: "Inmovilizado — retiro solo al salir de la empresa",
+      valor: 5538123,
+      ultimaActualizacion: todayISO()
+    },
+    {
+      id: "dale",
+      nombre: "Cuenta DALE",
+      descripcion: "Disponible — renta 10,5% EA",
+      valor: 1095539,
+      ultimaActualizacion: todayISO()
+    },
+    {
+      id: "efectivo",
+      nombre: "Efectivo",
+      descripcion: "Disponible",
+      valor: 20000,
+      ultimaActualizacion: todayISO()
+    }
+  ]
 };
+
 
 const HITOS_TIMELINE = [
   { fecha: "2026-06-04", label: "Prima jun.", detalle: "TC + Fondo saldados", monto: "+$940.371/mes", done: true },
@@ -145,6 +174,9 @@ let editingDebtId = null; // id de la deuda en edición
 let unsubTx = null;
 let allTransactions = [];
 let debtsState = JSON.parse(JSON.stringify(DEUDAS_INICIALES));
+let ahorrosState = [];
+let editingSavingId = null; // id del ahorro en edición
+
 
 // Privacidad: ocultar el monto de flujo libre (se recuerda en localStorage)
 let flujoHidden = localStorage.getItem("cfo_flujo_oculto") === "true";
@@ -189,7 +221,6 @@ function periodLabel() {
 }
 
 const fmt = (n) => "$" + Math.round(n).toLocaleString("es-CO");
-const todayISO = () => new Date().toISOString().split("T")[0];
 
 // ============================================================
 // SESIÓN PERSISTENTE — no volver a iniciar sesión cada vez
@@ -257,11 +288,13 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("app").classList.remove("hide");
     updatePeriodUI();
     await loadDebtsState(user.uid);
+    await loadSavingsState(user.uid);
     await processAutoDebits(user.uid);
     await loadCategories(user.uid);
     listenToTransactions(user.uid);
   } else {
     currentUser = null;
+    ahorrosState = [];
     localStorage.removeItem(SESION_KEY);
     localStorage.removeItem(NOMBRE_KEY);
     document.getElementById("app").classList.add("hide");
@@ -2645,4 +2678,244 @@ document.addEventListener("click", (e) => {
     }
   }
 });
+
+// ============================================================
+// GESTIÓN DE AHORROS E INMOVILIZADOS
+// ============================================================
+
+async function loadSavingsState(uid) {
+  try {
+    const docRef = doc(db, "users", uid, "meta", "ahorros");
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      await setDoc(docRef, AHORROS_INICIALES);
+      ahorrosState = JSON.parse(JSON.stringify(AHORROS_INICIALES.ahorros));
+    } else {
+      const data = snap.data();
+      if (data && Array.isArray(data.ahorros)) {
+        ahorrosState = data.ahorros;
+      } else {
+        // Migración automática del formato anterior
+        const migrated = [];
+        for (const key in data) {
+          if (data[key] && typeof data[key] === 'object' && data[key].nombre !== undefined) {
+            migrated.push({
+              id: data[key].id || key,
+              nombre: data[key].nombre,
+              descripcion: data[key].descripcion || data[key].estado || "",
+              valor: data[key].valor || 0,
+              ultimaActualizacion: data[key].ultimaActualizacion || todayISO()
+            });
+          }
+        }
+        await setDoc(docRef, { ahorros: migrated });
+        ahorrosState = migrated;
+      }
+    }
+  } catch (error) {
+    console.error("Error al cargar ahorros:", error);
+    ahorrosState = [];
+  }
+  renderSavings();
+}
+
+function getSavingIconAndColor(item) {
+  const name = (item.nombre || "").toLowerCase();
+  const id = (item.id || "").toLowerCase();
+  if (name.includes("cesantía") || id.includes("cesantias")) {
+    return { color: "green", icon: "house" };
+  }
+  if (name.includes("fondo") || id.includes("fondo")) {
+    return { color: "gold", icon: "lock" };
+  }
+  if (name.includes("dale") || id.includes("dale")) {
+    return { color: "sky", icon: "banknote" };
+  }
+  if (name.includes("efectivo") || id.includes("efectivo")) {
+    return { color: "sky", icon: "wallet" };
+  }
+  return { color: "sky", icon: "banknote" };
+}
+
+function formatSavingDate(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  const monthNames = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const mIndex = parseInt(month, 10) - 1;
+  return `${parseInt(day, 10)} ${monthNames[mIndex] || ""} ${year}`;
+}
+
+function renderSavings() {
+  const container = document.getElementById("savings-container");
+  if (!container) return;
+  
+  if (!ahorrosState || ahorrosState.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 20px; text-align: center; color: var(--text-3); font-size: 13.5px;">
+        No tienes ahorros registrados.
+      </div>
+    `;
+    return;
+  }
+  
+  let html = "";
+  ahorrosState.forEach(item => {
+    const { color, icon } = getSavingIconAndColor(item);
+    html += `
+      <div class="save-item" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+            <span class="save-ic ${color}"><i data-lucide="${icon}"></i></span>
+            <div class="save-info" style="min-width: 0;">
+              <div class="save-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; font-weight: 600;">${item.nombre}</div>
+              <div class="save-tag" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--text-3); margin-top: 1px;">${item.descripcion}</div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <div class="save-amt free num" style="font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13.5px; color: var(--brand); white-space: nowrap;">${fmt(item.valor)}</div>
+            <button class="cat-edit-link" onclick="openSavingsModal('${item.id}')" style="background: transparent; border: none; font-size: 12px; color: var(--brand); cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0;">
+              <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>Editar
+            </button>
+          </div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-3); text-align: left; padding-left: 50px;">
+          Actualizado: ${formatSavingDate(item.ultimaActualizacion)}
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+  renderIcons();
+}
+
+window.loadSavingsState = loadSavingsState;
+
+window.openSavingsModal = (id) => {
+  editingSavingId = id;
+  const modal = document.getElementById("savings-modal-bg");
+  
+  const titleEl = document.getElementById("savings-modal-title");
+  const nameEl = document.getElementById("saving-name");
+  const descEl = document.getElementById("saving-description");
+  const valEl = document.getElementById("saving-value");
+  const dateEl = document.getElementById("saving-date");
+  const deleteBtn = document.getElementById("saving-delete-btn");
+
+  if (typeof initMoneyInput === "function") {
+    initMoneyInput(valEl);
+  }
+
+  if (id === 'nuevo') {
+    titleEl.textContent = "Nuevo ahorro";
+    nameEl.value = "";
+    descEl.value = "";
+    valEl.value = "";
+    dateEl.value = todayISO();
+    if (deleteBtn) deleteBtn.classList.add("hide");
+  } else {
+    titleEl.textContent = "Editar ahorro";
+    const item = ahorrosState.find(a => a.id === id);
+    if (!item) return;
+    nameEl.value = item.nombre || "";
+    descEl.value = item.descripcion || "";
+    valEl.value = item.valor || 0;
+    dateEl.value = item.ultimaActualizacion || todayISO();
+    if (deleteBtn) deleteBtn.classList.remove("hide");
+  }
+  
+  modal.classList.remove("hide");
+  modal.classList.add("show");
+  renderIcons();
+};
+
+window.closeSavingsModal = () => {
+  const modal = document.getElementById("savings-modal-bg");
+  modal.classList.remove("show");
+  modal.classList.add("hide");
+};
+
+window.saveSavings = async () => {
+  if (!currentUser) return;
+  
+  const nameEl = document.getElementById("saving-name");
+  const descEl = document.getElementById("saving-description");
+  const valEl = document.getElementById("saving-value");
+  const dateEl = document.getElementById("saving-date");
+  
+  const nombre = nameEl.value.trim();
+  const descripcion = descEl.value.trim();
+  const rawVal = valEl.value;
+  const valor = parseFloat(rawVal) || 0;
+  const ultimaActualizacion = dateEl.value || todayISO();
+  
+  if (!nombre || !descripcion || rawVal === "") {
+    showToast("Por favor completa nombre, descripción y valor", true);
+    return;
+  }
+  
+  let currentItem = null;
+  
+  if (editingSavingId === 'nuevo') {
+    const newId = Date.now().toString();
+    currentItem = {
+      id: newId,
+      nombre,
+      descripcion,
+      valor,
+      ultimaActualizacion
+    };
+    ahorrosState.push(currentItem);
+  } else {
+    const itemIndex = ahorrosState.findIndex(a => a.id === editingSavingId);
+    if (itemIndex === -1) return;
+    
+    currentItem = {
+      ...ahorrosState[itemIndex],
+      nombre,
+      descripcion,
+      valor,
+      ultimaActualizacion
+    };
+    ahorrosState[itemIndex] = currentItem;
+  }
+  
+  try {
+    const docRef = doc(db, "users", currentUser.uid, "meta", "ahorros");
+    await setDoc(docRef, { ahorros: ahorrosState });
+    
+    window.closeSavingsModal();
+    renderSavings();
+    showToast(editingSavingId === 'nuevo' ? "Ahorro creado exitosamente" : "Ahorro actualizado exitosamente");
+  } catch (error) {
+    console.error("Error saving savings: ", error);
+    showToast("Error al guardar el ahorro", true);
+  }
+};
+
+window.deleteSavings = async (id) => {
+  const targetId = id || editingSavingId;
+  if (!targetId || targetId === 'nuevo') return;
+  
+  const item = ahorrosState.find(a => a.id === targetId);
+  if (!item) return;
+  
+  if (!confirm(`¿Estás segura de eliminar el ahorro "${item.nombre}"?`)) return;
+  
+  ahorrosState = ahorrosState.filter(a => a.id !== targetId);
+  
+  try {
+    const docRef = doc(db, "users", currentUser.uid, "meta", "ahorros");
+    await setDoc(docRef, { ahorros: ahorrosState });
+    
+    window.closeSavingsModal();
+    renderSavings();
+    showToast("Ahorro eliminado");
+  } catch (error) {
+    console.error("Error deleting savings: ", error);
+    showToast("Error al eliminar el ahorro", true);
+  }
+};
 

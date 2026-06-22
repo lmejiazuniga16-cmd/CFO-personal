@@ -72,7 +72,8 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
     `refConceptosExtra`, `debitSameValues`, y campos dinámicos indexados para cada cuota del mes
     (de 1 a `debitPaymentsPerMonth`): `debitDayX`, `debitAmountX`, `debitDateX`, `debitConceptsX` (array de `{nombre, valor}`).
   - `users/{uid}/transactions/{autoId}` — cada gasto/ingreso registrado.
-  - `users/{uid}/meta/ahorros`, `meta/perfil`, `meta/categorias` — documentos de configuración.
+  - `users/{uid}/meta/ahorros` — documento con el listado de ahorros en un array `ahorros` de objetos: `{ id, nombre, descripcion, valor, ultimaActualizacion }`.
+  - `users/{uid}/meta/perfil`, `meta/categorias` — documentos de configuración y perfil.
 - **Sincronización en vivo:** las transacciones se escuchan con `onSnapshot`
   (`listenToTransactions`), así cualquier cambio re-renderiza la UI al instante en
   todos los dispositivos. El listener se guarda en `unsubTx` y se cancela al cerrar sesión.
@@ -151,6 +152,8 @@ eliminarlo (ver "Editar/eliminar movimientos" en Arquitectura).
 - `initMoneyInput(input)` — helper que aplica formato automático de moneda colombiana (puntos de miles, coma decimal, prefijo `$`) a cualquier input numérico de monto. Llamar sobre cada input de monto al crearlo o inyectarlo en el DOM.
 - `openModal(type)` — abre el modal de registrar transacción recibiendo el tipo `'expense'` o `'income'` para preseleccionar la pestaña Gasto o Ingreso.
 - **Menú de acciones rápidas (FAB):** El botón flotante principal (`+`) despliega un menú vertical con tres opciones rápidas: **Gasto** (abre el modal en modo gasto), **Ingreso** (abre el modal en modo ingreso) y **Deuda** (abre `openDebtModal('nueva')` para crear una nueva deuda). Se colapsa al hacer clic en una opción o fuera del menú.
+- **Gestión de ahorros (`ahorrosState`)**: Los ahorros se cargan desde Firestore a la variable de estado `ahorrosState`. Las operaciones CRUD del modal `#savings-modal-bg` se gestionan mediante `openSavingsModal(id)`, `closeSavingsModal()`, `saveSavings()` y `deleteSavings(id)`, todos expuestos en `window.*`.
+
 
 
 ## Datos precargados (constantes en app.js)

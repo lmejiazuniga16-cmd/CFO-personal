@@ -877,22 +877,11 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 
       <div class="section">
         <div class="section-title" style="margin-bottom:13px;">Ahorros e inmovilizados</div>
-        <div class="card">
-          <div class="save-item">
-            <span class="save-ic green"><i data-lucide="house"></i></span>
-            <div class="save-info"><div class="save-name">Cesantías (Porvenir)</div><div class="save-tag">Intocable — subsidio vivienda</div></div>
-            <div class="save-amt locked num">$7.869.004</div>
-          </div>
-          <div class="save-item">
-            <span class="save-ic gold"><i data-lucide="lock"></i></span>
-            <div class="save-info"><div class="save-name">Ahorro permanente Fondo</div><div class="save-tag">Inmovilizado — solo al salir</div></div>
-            <div class="save-amt locked num">$5.538.123</div>
-          </div>
-          <div class="save-item">
-            <span class="save-ic sky"><i data-lucide="banknote"></i></span>
-            <div class="save-info"><div class="save-name">Cuenta DALE</div><div class="save-tag">Disponible — renta 10,5% EA</div></div>
-            <div class="save-amt free num">$1.095.539</div>
-          </div>
+        <button class="sim-btn" onclick="openSavingsModal('nuevo')" style="background: var(--brand); color: var(--brand-ink); margin-bottom: 14px; border: none; height: 36px; cursor: pointer;">
+          ＋ Nuevo ahorro
+        </button>
+        <div class="card" id="savings-container">
+          <!-- Tarjetas dinámicas -->
         </div>
       </div>
     </div>
@@ -1193,6 +1182,46 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
       <button class="cat-add-btn" onclick="addNewCat()"><i data-lucide="plus"></i>Agregar</button>
     </div>
     <button class="modal-submit" style="margin-top:18px;" onclick="closeCatModal()"><i data-lucide="check"></i>Listo</button>
+  </div>
+<!-- MODAL: ahorros -->
+<div class="modal-bg hide" id="savings-modal-bg" onclick="if(event.target.id==='savings-modal-bg') closeSavingsModal()">
+  <div class="modal" style="position: relative; max-height: 90vh;">
+    <button type="button" class="close-modal-btn" onclick="closeSavingsModal()" style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: var(--text-3); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; transition: background .15s, color .15s;">
+      <i data-lucide="x"></i>
+    </button>
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="savings-modal-title" style="margin-right: 40px;">Editar ahorro</div>
+    
+    <form id="savings-form" onsubmit="event.preventDefault();" autocomplete="off">
+      <div class="form-section">
+        <div class="field compact-field">
+          <div class="field-label">Nombre</div>
+          <input type="text" id="saving-name" placeholder="Ej: Cesantías (Porvenir)" required>
+        </div>
+        <div class="field compact-field">
+          <div class="field-label">Descripción</div>
+          <input type="text" id="saving-description" placeholder="Ej: Intocable — subsidio vivienda" required>
+        </div>
+        <div class="field compact-field">
+          <div class="field-label">Valor actual (COP)</div>
+          <input type="text" id="saving-value" placeholder="0" required>
+        </div>
+        <div class="field compact-field">
+          <div class="field-label">Fecha de última actualización</div>
+          <input type="date" id="saving-date" required>
+        </div>
+      </div>
+      
+      <!-- Pie de página: botones de acción -->
+      <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; align-items: center;">
+        <button type="button" class="modal-delete hide" id="saving-delete-btn" onclick="deleteSavings()" style="margin-top: 0; width: auto; padding: 12px 20px;">
+          <i data-lucide="trash-2"></i>Eliminar ahorro
+        </button>
+        <button type="button" class="modal-submit" onclick="saveSavings()" style="margin-top: 0; width: auto; padding: 12px 24px; min-width: 140px; margin-left: auto;">
+          <i data-lucide="check"></i>Guardar ahorro
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
