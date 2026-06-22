@@ -538,6 +538,22 @@ function mergeConcepts(refConcepts, existingConcepts) {
   });
 }
 
+window.cleanNumberInput = (input) => {
+  let val = input.value;
+  if (val.length > 1 && val.startsWith('0')) {
+    let parsed = parseInt(val, 10);
+    input.value = isNaN(parsed) ? 0 : parsed;
+  }
+};
+
+window.handleNumberPaste = (e) => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  const clean = parseInt(text.replace(/\D/g, ''), 10);
+  e.target.value = isNaN(clean) ? 0 : clean;
+  e.target.dispatchEvent(new Event('input'));
+};
+
 window.renderDebitCuotasConfig = (savedData = null) => {
   const container = document.getElementById("debt-debit-cuotas-config-container");
   if (!container) return;
@@ -597,7 +613,7 @@ window.renderDebitCuotasConfig = (savedData = null) => {
       html += `
         <div class="flex-row debit-concept-row" data-cuota-index="1" data-concept-name="${c.nombre}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
           <span style="font-size: 13px; color: var(--text-2); flex: 2;">${c.nombre}</span>
-          <input type="number" class="debit-concept-val" value="${c.valor}" oninput="updateDebitTotal(1)" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: right; font-family: var(--f-mono); font-size: 13px;">
+          <input type="number" class="debit-concept-val" value="${c.valor}" oninput="cleanNumberInput(this); updateDebitTotal(1)" onpaste="handleNumberPaste(event)" onfocus="this.select()" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-align: right; font-family: var(--f-mono); font-size: 13px;">
         </div>
       `;
     });
@@ -656,7 +672,7 @@ window.renderDebitCuotasConfig = (savedData = null) => {
         html += `
           <div class="flex-row debit-concept-row" data-cuota-index="${i}" data-concept-name="${c.nombre}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
             <span style="font-size: 13px; color: var(--text-2); flex: 2;">${c.nombre}</span>
-            <input type="number" class="debit-concept-val" value="${c.valor}" oninput="updateDebitTotal(${i})" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: right; font-family: var(--f-mono); font-size: 13px;">
+            <input type="number" class="debit-concept-val" value="${c.valor}" oninput="cleanNumberInput(this); updateDebitTotal(${i})" onpaste="handleNumberPaste(event)" onfocus="this.select()" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-align: right; font-family: var(--f-mono); font-size: 13px;">
           </div>
         `;
       });
@@ -926,9 +942,10 @@ window.saveDebt = async () => {
   }
 };
 
-window.closeDebtModal = () => {
+function closeDebtModal() {
   document.getElementById("debt-modal-bg").classList.remove("show");
-};
+}
+window.closeDebtModal = closeDebtModal;
 
 window.deleteDebt = async () => {
   if (!currentUser || !editingDebtId) return;
