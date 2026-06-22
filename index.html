@@ -453,6 +453,59 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 .modal-submit svg.lucide{width:18px;height:18px;}
 .modal-submit:active{transform:scale(0.985);}
 .modal-submit:hover{filter:brightness(1.05);}
+
+/* Estilos para el rediseño del modal de deudas */
+.form-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.form-section-title {
+  font-family: var(--f-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.compact-field {
+  margin-bottom: 8px;
+}
+.compact-field:last-child {
+  margin-bottom: 0;
+}
+.compact-field .field-label {
+  margin-bottom: 4px;
+  font-size: 11.5px;
+}
+.compact-field input, .compact-field select {
+  padding: 9px 12px;
+  font-size: 14px;
+}
+.flex-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.sub-section {
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 8px;
+  background: var(--bg-elev);
+}
+.sub-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
 .modal-delete{width:100%;background:transparent;color:var(--red);font-weight:600;padding:13px;border-radius:13px;font-size:14px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s;}
 .modal-delete svg.lucide{width:17px;height:17px;}
 .modal-delete:hover{background:var(--red-tint,rgba(242,106,94,0.12));}
@@ -846,152 +899,205 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 
 <!-- MODAL: deuda -->
 <div class="modal-bg" id="debt-modal-bg" onclick="if(event.target.id==='debt-modal-bg') closeDebtModal()">
-  <div class="modal">
+  <div class="modal" style="position: relative; max-height: 90vh;">
+    <button type="button" class="close-modal-btn" onclick="closeDebtModal()" style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: var(--text-3); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; transition: background .15s, color .15s;">
+      <i data-lucide="x"></i>
+    </button>
     <div class="modal-handle"></div>
-    <div class="modal-title" id="debt-modal-title">Editar deuda</div>
+    <div class="modal-title" id="debt-modal-title" style="margin-right: 40px;">Editar deuda</div>
     
-    <div class="field">
-      <div class="field-label">Tipo de crédito</div>
-      <select id="debt-type" onchange="toggleDebtType()">
-        <option value="automatico">Crédito con débito automático</option>
-        <option value="tarjeta">Crédito de TC</option>
-      </select>
-    </div>
-
-    <!-- Campos comunes -->
-    <div class="field">
-      <div class="field-label">Nombre de la deuda</div>
-      <input type="text" id="debt-name" placeholder="Ej: Libranza Banco de Occidente">
-    </div>
-    <div class="field">
-      <div class="field-label">Saldo actual (COP)</div>
-      <input type="number" inputmode="numeric" id="debt-saldo" placeholder="0">
-    </div>
-    <div class="field">
-      <div class="field-label">Tasa EA (%)</div>
-      <input type="number" inputmode="numeric" id="debt-tasaEA" placeholder="0">
-    </div>
-    <div class="field">
-      <div class="field-label">Descripción del pago</div>
-      <input type="text" id="debt-pago" placeholder="Ej: Nómina automática, Paga ella (día 30)">
-    </div>
-    <div class="field">
-      <div class="field-label">Color</div>
-      <select id="debt-color">
-        <option value="blue">Azul</option>
-        <option value="amber">Ámbar</option>
-        <option value="emerald">Esmeralda</option>
-        <option value="sky">Cielo</option>
-      </select>
-    </div>
-    <div class="field">
-      <label class="field-label"><input type="checkbox" id="debt-automaticDebit" onchange="toggleDebtAutoFields()"> Débito automático</label>
-    </div>
-    <div id="debt-auto-fields" class="hide">
-      <div class="field">
-        <div class="field-label">Cuotas por mes</div>
-        <input type="number" inputmode="numeric" id="debt-debitPaymentsPerMonth" min="1" max="31" placeholder="1" onchange="toggleDebtAutoFields()">
-      </div>
-      <div class="field" id="debt-auto-start-date-field">
-        <div class="field-label">Fecha de inicio del débito automático</div>
-        <input type="date" id="debt-debitStartDate">
-      </div>
-      <div id="debt-debits-container"></div>
-    </div>
-
-    <!-- Campos específicos: automatico -->
-    <div id="debt-fields-automatico">
-      <div style="font-weight: 600; font-size: 14px; margin-top: 15px; margin-bottom: 10px; color: var(--gold);">Detalle del pago mensual (referencia)</div>
-      <div class="field">
-        <div class="field-label">Abono a capital (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-refCapital" placeholder="0" oninput="updateRefTotalAuto()">
-      </div>
-      <div class="field">
-        <div class="field-label">Intereses corrientes (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-refIntereses-auto" placeholder="0" oninput="updateRefTotalAuto()">
-      </div>
-      <div class="field">
-        <div class="field-label">Seguro vida deudor (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-refSeguro" placeholder="0" oninput="updateRefTotalAuto()">
-      </div>
-      <div class="field">
-        <div class="field-label">Otros conceptos (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-refOtros" placeholder="0" oninput="updateRefTotalAuto()">
-      </div>
-      <div class="field">
-        <div class="field-label">Total mensual (Referencia)</div>
-        <input type="number" id="debt-refTotal-auto" readonly style="background: var(--surface); color: var(--text-2);">
+    <form id="debt-form" onsubmit="event.preventDefault();" autocomplete="off">
+      
+      <!-- Apartado 1 — Información general -->
+      <div class="form-section">
+        <div class="form-section-title">Apartado 1 — Información general</div>
+        
+        <div class="field compact-field">
+          <div class="field-label">Tipo de crédito</div>
+          <select id="debt-type" onchange="toggleDebtType()">
+            <option value="automatico">Crédito con débito automático</option>
+            <option value="tarjeta">Crédito de TC</option>
+          </select>
+        </div>
+        
+        <div class="field compact-field">
+          <div class="field-label">Nombre de la deuda</div>
+          <input type="text" id="debt-name" placeholder="Ej: Libranza Banco de Occidente">
+        </div>
+        
+        <div class="field compact-field">
+          <div class="field-label">Saldo actual (COP)</div>
+          <input type="number" inputmode="numeric" id="debt-saldo" placeholder="0">
+        </div>
+        
+        <div class="field compact-field">
+          <div class="field-label">Tasa EA (%)</div>
+          <input type="number" inputmode="numeric" id="debt-tasaEA" placeholder="0">
+        </div>
+        
+        <div class="field compact-field">
+          <div class="field-label">Descripción del pago</div>
+          <input type="text" id="debt-pago" placeholder="Ej: Nómina automática, Paga ella (día 30)">
+        </div>
       </div>
       
-      <div class="field">
-        <div class="field-label">Número de cuotas de nómina al mes</div>
-        <select id="debt-paymentsMonth-auto" onchange="toggleRefPaymentsAuto()">
-          <option value="1">1 cuota</option>
-          <option value="2">2 cuotas</option>
-        </select>
-      </div>
-      <div class="field" id="debt-cuotaUnica-container">
-        <div class="field-label">Valor cuota única (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-cuotaMensual-auto" placeholder="0">
-      </div>
-      <div id="debt-dosCuotas-container" class="hide">
-        <div class="field">
-          <div class="field-label">Valor cuota 1 (COP)</div>
-          <input type="number" inputmode="numeric" id="debt-debitAmount1-auto" placeholder="0">
+      <!-- Apartado 2 — Detalle del pago mensual (referencia) -->
+      <div class="form-section" id="debt-section-ref">
+        <div class="form-section-title">Apartado 2 — Detalle del pago mensual (referencia)</div>
+        
+        <!-- Vista Específica: automatico -->
+        <div id="debt-ref-fields-automatico">
+          <div class="field compact-field">
+            <div class="field-label">Abono a capital (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-refCapital" placeholder="0" oninput="updateRefTotalAuto()">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Intereses corrientes (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-refIntereses-auto" placeholder="0" oninput="updateRefTotalAuto()">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Seguro vida deudor (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-refSeguro" placeholder="0" oninput="updateRefTotalAuto()">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Otros conceptos (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-refOtros" placeholder="0" oninput="updateRefTotalAuto()">
+          </div>
+          
+          <!-- Contenedor Conceptos Extra -->
+          <div id="debt-refConceptosExtra-container" style="margin-top: 8px; margin-bottom: 8px;"></div>
+          <button type="button" id="btn-add-refConceptoExtra" onclick="addRefConceptoExtraRow()" style="background: transparent; border: 1px dashed var(--line); color: var(--brand); font-weight: 600; padding: 8px; border-radius: 10px; font-size: 12px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 12px;">
+            <i data-lucide="plus"></i>＋ Añadir concepto
+          </button>
+          
+          <div class="field compact-field">
+            <div class="field-label">Total mensual (Referencia)</div>
+            <input type="number" id="debt-refTotal-auto" readonly style="background: var(--surface-2); color: var(--text-2); font-weight: bold;">
+          </div>
+          
+          <div class="field compact-field">
+            <div class="field-label">Número de cuotas de nómina al mes</div>
+            <select id="debt-paymentsMonth-auto" onchange="toggleRefPaymentsAuto()">
+              <option value="1">1 cuota</option>
+              <option value="2">2 cuotas</option>
+            </select>
+          </div>
+          
+          <!-- Contenedor cuota única / dos cuotas -->
+          <div class="field compact-field" id="debt-cuotaUnica-container">
+            <div class="field-label">Valor cuota única (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-cuotaMensual-auto" placeholder="0">
+          </div>
+          <div id="debt-dosCuotas-container" class="hide">
+            <div class="field compact-field">
+              <div class="field-label">Valor cuota 1 (COP)</div>
+              <input type="number" inputmode="numeric" id="debt-debitAmount1-auto" placeholder="0">
+            </div>
+            <div class="field compact-field">
+              <div class="field-label">Valor cuota 2 (COP)</div>
+              <input type="number" inputmode="numeric" id="debt-debitAmount2-auto" placeholder="0">
+            </div>
+          </div>
+          
+          <div class="field compact-field">
+            <div class="field-label">Cuotas restantes</div>
+            <input type="number" inputmode="numeric" id="debt-cuotas-auto" placeholder="0">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Fecha estimada de fin</div>
+            <input type="date" id="debt-fechaFin-auto">
+          </div>
         </div>
-        <div class="field">
-          <div class="field-label">Valor cuota 2 (COP)</div>
-          <input type="number" inputmode="numeric" id="debt-debitAmount2-auto" placeholder="0">
+        
+        <!-- Vista Específica: tarjeta -->
+        <div id="debt-ref-fields-tarjeta" class="hide">
+          <div class="field compact-field">
+            <div class="field-label">Abono a la deuda (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-refAbono" placeholder="0" oninput="updateRefTotalTarjeta()">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Intereses (COP)</div>
+            <input type="number" inputmode="numeric" id="debt-refIntereses-tarjeta" placeholder="0" oninput="updateRefTotalTarjeta()">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Total mensual (Referencia)</div>
+            <input type="number" id="debt-refTotal-tarjeta" readonly style="background: var(--surface-2); color: var(--text-2); font-weight: bold;">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Número de cuotas al mes</div>
+            <div style="background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; color: var(--text-2); font-size: 14px;">1 cuota (Fijo)</div>
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Valor cuota mensual sugerida (COP)</div>
+            <input type="number" id="debt-cuotaMensual-tarjeta" readonly style="background: var(--surface-2); color: var(--text-2); font-weight: bold;">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Cuotas restantes</div>
+            <input type="number" inputmode="numeric" id="debt-cuotas-tarjeta" placeholder="0">
+          </div>
+          <div class="field compact-field">
+            <div class="field-label">Fecha estimada de fin</div>
+            <input type="date" id="debt-fechaFin-tarjeta">
+          </div>
         </div>
       </div>
-      <div class="field">
-        <label class="field-label"><input type="checkbox" id="debt-abonoParcial"> Admite abono parcial a capital</label>
+      
+      <!-- Apartado 3 — Configuración de pago -->
+      <div class="form-section">
+        <div class="form-section-title">Apartado 3 — Configuración de pago</div>
+        
+        <div class="field compact-field" id="debt-abonoParcial-field-wrapper">
+          <label class="field-label" style="justify-content: flex-start; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="debt-abonoParcial" style="width: auto;"> ¿Permite abono parcial a capital?
+          </label>
+        </div>
+        
+        <div class="field compact-field">
+          <label class="field-label" style="justify-content: flex-start; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="debt-automaticDebit" onchange="toggleDebtAutoFields()" style="width: auto;"> ¿Tiene débito automático?
+          </label>
+        </div>
       </div>
-      <div class="field">
-        <div class="field-label">Cuotas restantes</div>
-        <input type="number" inputmode="numeric" id="debt-cuotas-auto" placeholder="0">
+      
+      <!-- Apartado 4 — Configuración de débito automático -->
+      <div class="form-section hide" id="debt-section-auto">
+        <div class="form-section-title">Apartado 4 — Configuración de débito automático</div>
+        
+        <div class="field compact-field">
+          <div class="field-label">Fecha de inicio del débito (Opcional)</div>
+          <input type="date" id="debt-debitStartDate">
+        </div>
+        
+        <div class="field compact-field">
+          <div class="field-label">¿Cuántas cuotas se debitan al mes?</div>
+          <select id="debt-debitPaymentsPerMonth" onchange="handleDebitPaymentsPerMonthChange()">
+            <option value="1">1 cuota</option>
+            <option value="2">2 cuotas</option>
+          </select>
+        </div>
+        
+        <div class="field compact-field">
+          <div class="field-label">¿Los conceptos y valores son iguales en todas las cuotas del mes?</div>
+          <select id="debt-debitSameValues" onchange="handleSameValuesChange()">
+            <option value="true">Sí (Valores iguales)</option>
+            <option value="false">No (Valores diferentes)</option>
+          </select>
+        </div>
+        
+        <!-- Contenedor para la configuración de las cuotas del débito automático -->
+        <div id="debt-debit-cuotas-config-container" style="margin-top: 12px;"></div>
       </div>
-      <div class="field">
-        <div class="field-label">Fecha fin estimada</div>
-        <input type="date" id="debt-fechaFin-auto">
+      
+      <!-- Pie de página: botones de acción -->
+      <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; align-items: center;">
+        <button type="button" class="modal-delete hide" id="debt-delete-btn" onclick="deleteDebt()" style="margin-top: 0; width: auto; padding: 12px 20px;">
+          <i data-lucide="trash-2"></i>Eliminar deuda
+        </button>
+        <button type="button" class="modal-submit" onclick="saveDebt()" style="margin-top: 0; width: auto; padding: 12px 24px; min-width: 140px; margin-left: auto;">
+          <i data-lucide="check"></i>Guardar deuda
+        </button>
       </div>
-    </div>
-
-    <!-- Campos específicos: tarjeta -->
-    <div id="debt-fields-tarjeta" class="hide">
-      <div style="font-weight: 600; font-size: 14px; margin-top: 15px; margin-bottom: 10px; color: var(--gold);">Detalle del pago mensual (referencia)</div>
-      <div class="field">
-        <div class="field-label">Abono a la deuda (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-refAbono" placeholder="0" oninput="updateRefTotalTarjeta()">
-      </div>
-      <div class="field">
-        <div class="field-label">Intereses (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-refIntereses-tarjeta" placeholder="0" oninput="updateRefTotalTarjeta()">
-      </div>
-      <div class="field">
-        <div class="field-label">Total mensual (Referencia)</div>
-        <input type="number" id="debt-refTotal-tarjeta" readonly style="background: var(--surface); color: var(--text-2);">
-      </div>
-      <div class="field">
-        <div class="field-label">Número de cuotas al mes</div>
-        <input type="text" value="1 cuota (Fijo)" readonly style="background: var(--surface); color: var(--text-2);">
-      </div>
-      <div class="field">
-        <div class="field-label">Valor cuota mensual sugerida (COP)</div>
-        <input type="number" inputmode="numeric" id="debt-cuotaMensual-tarjeta" placeholder="0">
-      </div>
-      <div class="field">
-        <div class="field-label">Cuotas restantes</div>
-        <input type="number" inputmode="numeric" id="debt-cuotas-tarjeta" placeholder="0">
-      </div>
-      <div class="field">
-        <div class="field-label">Fecha fin estimada</div>
-        <input type="date" id="debt-fechaFin-tarjeta">
-      </div>
-    </div>
-    <button class="modal-submit" onclick="saveDebt()"><i data-lucide="check"></i>Guardar deuda</button>
-    <button class="modal-delete" onclick="deleteDebt()"><i data-lucide="trash-2"></i>Eliminar deuda</button>
-    <button style="width:100%;background:transparent;color:var(--text-2);font-weight:600;padding:13px;border-radius:13px;font-size:14px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s;border:1px solid var(--line);" onclick="closeDebtModal()"><i data-lucide="x"></i>Cerrar</button>
+    </form>
   </div>
 </div>
 

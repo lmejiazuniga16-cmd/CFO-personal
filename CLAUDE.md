@@ -69,7 +69,8 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
     `saldoOriginal`, `cuotaMensual`, `tasaEA`, `cuotasRestantes`, `fechaFin`, `pago`,
     `abonoParcial`, `automaticDebit`, `debitPaymentsPerMonth`, `debitDay1`, `debitAmount1`,
     `debitDay2`, `debitAmount2`, `debitStartDate`, `lastAutoDebitRun`, `color`, `debtType`,
-    `refCapital`, `refIntereses`, `refSeguro`, `refOtros`, `refAbono`.
+    `refCapital`, `refIntereses`, `refSeguro`, `refOtros`, `refAbono`, `refConceptosExtra`,
+    `debitSameValues`, `debitConcepts1`, `debitConcepts2`.
   - `users/{uid}/transactions/{autoId}` — cada gasto/ingreso registrado.
   - `users/{uid}/meta/ahorros`, `meta/perfil`, `meta/categorias` — documentos de configuración.
 - **Sincronización en vivo:** las transacciones se escuchan con `onSnapshot`
@@ -185,14 +186,18 @@ Cada deuda es un documento con campos comunes y campos específicos del tipo:
   refIntereses: 0,                  // intereses mensuales de referencia
   refSeguro: 0,                     // seguro vida de referencia (solo automatico)
   refOtros: 0,                      // otros conceptos de referencia (solo automatico)
+  refConceptosExtra: [],            // conceptos dinámicos extra (solo automatico): array de {nombre, valor}
   refAbono: 0,                      // abono mensual de referencia (solo tarjeta)
   // Campos de débito automático:
   automaticDebit: false,           // true = automática, false = manual
   debitPaymentsPerMonth: 1,         // 1 o 2 cuotas al mes
+  debitSameValues: true,            // true = conceptos/valores iguales, false = diferentes
   debitDay1: 1,                     // día del mes de la cuota 1
   debitAmount1: 698886,             // monto de la cuota 1
   debitDay2: 15,                    // día del mes de la cuota 2 (solo si hay 2)
   debitAmount2: 0,                  // monto de la cuota 2
+  debitConcepts1: [],               // conceptos específicos de la cuota 1: array de {nombre, valor}
+  debitConcepts2: [],               // conceptos específicos de la cuota 2 (si aplica)
   debitStartDate: null,             // fecha de inicio (ISO YYYY-MM-DD)
   lastAutoDebitRun: null            // fecha del último débito procesado
 }
