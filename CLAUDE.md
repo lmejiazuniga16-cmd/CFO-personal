@@ -81,8 +81,9 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
     se aplican al iniciar sesión con `processAutoDebits()`. Cada débito crea una
     transacción de gasto de categoría "Deuda" y reduce el saldo automáticamente.
   - **Deudas manuales:** si `automaticDebit` es `false`, la usuaria ve un botón
-    "Registrar pago del mes" en la tarjeta. Al clickearlo abre un `prompt()` que sugiere
-    la cuota mensual. El pago manual crea una transacción y actualiza el saldo.
+    "Registrar pago o abono" en la tarjeta. Si la deuda admite abono parcial (`abonoParcial === true`),
+    se abre un modal de desglose de conceptos quincenales/extraordinarios. Si no, se abre
+    un modal simplificado de pago.
   - En ambos casos, `renderDebts()` muestra la etiqueta "Débito automático" o "Manual"
     y botón "Editar" que abre el modal de edición de deuda (`openDebtModal`).
 - **Editar/eliminar movimientos:** cualquier transacción de la lista (preview de Inicio
@@ -92,10 +93,7 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
   movimiento" hace `deleteDoc` con confirmación. Al editar se oculta el selector
   Gasto↔Ingreso; si la categoría del movimiento ya fue borrada, se reinyecta como opción.
 - **Editar deudas:** modal de deuda (`debt-modal-bg`) permite cambiar nombre, saldo,
-  cuotas, cuota mensual, tasa, descripción del pago, y activar/configurar débito
-  automático. Si es automático, muestra campos para elegir 1 o 2 cuotas al mes, el día
-  de cada cuota, el monto, y la fecha de inicio. `saveDebt()` actualiza en Firestore
-  y recarga el renderizado.
+  cuotas, cuota mensual, tasa, descripción del pago, y configurar cuotas/quincenas por mes (1 o 2) y sus fechas/montos. Esto se muestra tanto para débito automático como para deudas que admiten abono parcial (`abonoParcial === true`). La fecha de inicio de débito automático solo se muestra si `automaticDebit` está activo. `saveDebt()` actualiza en Firestore y recarga el renderizado.
 - **Seed inicial:** la primera vez que un usuario entra (sin deudas en Firestore),
   `seedInitialData` precarga las constantes `DEUDAS_INICIALES`, `AHORROS_INICIALES`
   y el perfil. A partir de ahí los datos viven en Firestore.
@@ -213,11 +211,15 @@ Cada deuda es un documento con campos comunes y campos específicos del tipo:
 
 ### Flujo de deudas manuales
 
-1. **Registro:** la usuaria clickea "Registrar pago del mes" en la tarjeta de deuda
-2. Un `prompt()` abre con la sugerencia de monto (`cuotaMensual`)
-3. La usuaria ingresa el monto que abonó (se limpia de puntos y comas)
-4. `registerDebtPayment()` llama a `applyDebtPayment()` con `isAuto === false`
-5. Se crea la transacción, se actualiza el saldo y se recarga la vista
+1. **Registro:** la usuaria hace clic en "Registrar pago o abono" en la tarjeta de la deuda (`registerDebtPayment`).
+2. **Modal de pago:**
+   - Si la deuda no admite abono parcial (`abonoParcial: false`, ej. Nubank), se abre el modal simple para registrar el pago mensual o abono extra.
+   - Si admite abono parcial (`abonoParcial: true`, ej. Libranza), se abre el modal quincenal por conceptos (`buildPartialDebtPayModal`).
+3. **Modal de conceptos (Libranza/Abono Parcial):**
+   - Inicializa 4 conceptos ("Abono a capital", "Intereses corrientes", "Seguro vida deudor" y "Otros conceptos") y permite agregar/eliminar conceptos.
+   - Selecciona por defecto "Quincena 1" o "Quincena 2" según la fecha elegida (1-15 vs 16+), o "Abono Extraordinario" si se requiere.
+   - Calcula el total y simula el impacto en saldo, cuotas restantes y fecha de fin en tiempo real.
+4. **Confirmación:** `confirmPartialDebtPayment()` registra la transacción de gasto con el total de conceptos, actualiza el saldo reduciendo *únicamente* el "Abono a capital", recalcula las cuotas restantes estimadas (`Math.ceil(nuevoSaldo / cuotaMensual)`) y la nueva fecha de fin (`addMonthsToDate` desde hoy), y actualiza Firestore.
 
 ### Edición de una deuda existente
 

@@ -881,7 +881,7 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
         <div class="field-label">Cuotas por mes</div>
         <input type="number" inputmode="numeric" id="debt-debitPaymentsPerMonth" min="1" max="31" placeholder="1" onchange="toggleDebtAutoFields()">
       </div>
-      <div class="field">
+      <div class="field" id="debt-auto-start-date-field">
         <div class="field-label">Fecha de inicio del débito automático</div>
         <input type="date" id="debt-debitStartDate">
       </div>
