@@ -877,7 +877,7 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 
       <div class="section">
         <div class="section-title" style="margin-bottom:13px;">Ahorros e inmovilizados</div>
-        <button class="sim-btn" onclick="openSavingsModal('nuevo')" style="background: var(--brand); color: var(--brand-ink); margin-bottom: 14px; border: none; height: 36px; cursor: pointer;">
+        <button class="sim-btn" onclick="window.openSavingsModal('nuevo')" style="background: var(--brand); color: var(--brand-ink); margin-bottom: 14px; border: none; height: 36px; cursor: pointer;">
           ＋ Nuevo ahorro
         </button>
         <div class="card" id="savings-container">
@@ -1183,10 +1183,11 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
     </div>
     <button class="modal-submit" style="margin-top:18px;" onclick="closeCatModal()"><i data-lucide="check"></i>Listo</button>
   </div>
+</div>
 <!-- MODAL: ahorros -->
-<div class="modal-bg hide" id="savings-modal-bg" onclick="if(event.target.id==='savings-modal-bg') closeSavingsModal()">
+<div class="modal-bg hide" id="savings-modal-bg" onclick="if(event.target.id==='savings-modal-bg') window.closeSavingsModal()">
   <div class="modal" style="position: relative; max-height: 90vh;">
-    <button type="button" class="close-modal-btn" onclick="closeSavingsModal()" style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: var(--text-3); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; transition: background .15s, color .15s;">
+    <button type="button" class="close-modal-btn" onclick="window.closeSavingsModal()" style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: var(--text-3); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; transition: background .15s, color .15s;">
       <i data-lucide="x"></i>
     </button>
     <div class="modal-handle"></div>
@@ -1214,10 +1215,10 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
       
       <!-- Pie de página: botones de acción -->
       <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; align-items: center;">
-        <button type="button" class="modal-delete hide" id="saving-delete-btn" onclick="deleteSavings()" style="margin-top: 0; width: auto; padding: 12px 20px;">
+        <button type="button" class="modal-delete hide" id="saving-delete-btn" onclick="window.deleteSavings()" style="margin-top: 0; width: auto; padding: 12px 20px;">
           <i data-lucide="trash-2"></i>Eliminar ahorro
         </button>
-        <button type="button" class="modal-submit" onclick="saveSavings()" style="margin-top: 0; width: auto; padding: 12px 24px; min-width: 140px; margin-left: auto;">
+        <button type="button" class="modal-submit" onclick="window.saveSavings()" style="margin-top: 0; width: auto; padding: 12px 24px; min-width: 140px; margin-left: auto;">
           <i data-lucide="check"></i>Guardar ahorro
         </button>
       </div>

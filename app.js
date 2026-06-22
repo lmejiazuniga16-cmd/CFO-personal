@@ -2775,7 +2775,7 @@ function renderSavings() {
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
             <div class="save-amt free num" style="font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13.5px; color: var(--brand); white-space: nowrap;">${fmt(item.valor)}</div>
-            <button class="cat-edit-link" onclick="openSavingsModal('${item.id}')" style="background: transparent; border: none; font-size: 12px; color: var(--brand); cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0;">
+            <button class="cat-edit-link" onclick="window.openSavingsModal('${item.id}')" style="background: transparent; border: none; font-size: 12px; color: var(--brand); cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0;">
               <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>Editar
             </button>
           </div>
