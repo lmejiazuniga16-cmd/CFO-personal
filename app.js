@@ -314,8 +314,13 @@ async function loadDebtsState(uid) {
 window.toggleDebtType = () => {
   const type = document.getElementById("debt-type").value;
   const isAuto = type === "automatico";
-  document.getElementById("debt-fields-automatico").classList.toggle("hide", !isAuto);
-  document.getElementById("debt-fields-tarjeta").classList.toggle("hide", isAuto);
+  
+  // Detalle del pago mensual (referencia) - Apartado 2
+  document.getElementById("debt-ref-fields-automatico").classList.toggle("hide", !isAuto);
+  document.getElementById("debt-ref-fields-tarjeta").classList.toggle("hide", isAuto);
+  
+  // Abono parcial - Apartado 3
+  document.getElementById("debt-abonoParcial-field-wrapper").classList.toggle("hide", !isAuto);
   
   toggleDebtAutoFields();
 };
@@ -325,19 +330,69 @@ window.updateRefTotalAuto = () => {
   const int = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
   const seg = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
   const otr = parseFloat(document.getElementById("debt-refOtros").value) || 0;
-  document.getElementById("debt-refTotal-auto").value = cap + int + seg + otr;
+  
+  let extraSum = 0;
+  const extraRows = document.querySelectorAll(".ref-concepto-extra-value");
+  extraRows.forEach(input => {
+    extraSum += parseFloat(input.value) || 0;
+  });
+  
+  const total = cap + int + seg + otr + extraSum;
+  document.getElementById("debt-refTotal-auto").value = total;
+  
+  // Auto-calculate cuota fields
+  const numPayments = Number(document.getElementById("debt-paymentsMonth-auto").value) || 1;
+  if (numPayments === 2) {
+    document.getElementById("debt-debitAmount1-auto").value = total / 2;
+    document.getElementById("debt-debitAmount2-auto").value = total / 2;
+  } else {
+    document.getElementById("debt-cuotaMensual-auto").value = total;
+  }
+  
+  if (typeof syncDebitFieldsFromRef === "function") {
+    syncDebitFieldsFromRef();
+  }
 };
 
 window.updateRefTotalTarjeta = () => {
   const abono = parseFloat(document.getElementById("debt-refAbono").value) || 0;
   const int = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value) || 0;
-  document.getElementById("debt-refTotal-tarjeta").value = abono + int;
+  const total = abono + int;
+  document.getElementById("debt-refTotal-tarjeta").value = total;
+  document.getElementById("debt-cuotaMensual-tarjeta").value = total;
 };
 
 window.toggleRefPaymentsAuto = () => {
   const val = Number(document.getElementById("debt-paymentsMonth-auto").value) || 1;
   document.getElementById("debt-cuotaUnica-container").classList.toggle("hide", val !== 1);
   document.getElementById("debt-dosCuotas-container").classList.toggle("hide", val !== 2);
+  
+  updateRefTotalAuto();
+};
+
+window.addRefConceptoExtraRow = (name = "", value = 0) => {
+  const container = document.getElementById("debt-refConceptosExtra-container");
+  if (!container) return;
+  
+  const div = document.createElement("div");
+  div.className = "flex-row ref-concepto-extra-row";
+  div.style = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
+  div.innerHTML = `
+    <input type="text" class="ref-concepto-extra-name" placeholder="Concepto extra" value="${name}" style="flex: 2; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface);">
+    <input type="number" class="ref-concepto-extra-value" placeholder="Monto" value="${value || ''}" oninput="updateRefTotalAuto()" style="flex: 1; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); text-align: right; font-family: var(--f-mono);">
+    <button type="button" class="btn-delete-refConceptoExtra" style="background: transparent; border: none; color: var(--red); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 6px; border-radius: 8px;">
+      <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+    </button>
+  `;
+  
+  div.querySelector(".btn-delete-refConceptoExtra").onclick = () => {
+    div.remove();
+    updateRefTotalAuto();
+  };
+  
+  container.appendChild(div);
+  renderIcons();
+  updateRefTotalAuto();
 };
 
 window.openDebtModal = (id) => {
@@ -355,7 +410,6 @@ window.openDebtModal = (id) => {
   document.getElementById("debt-saldo").value = debt.saldo || 0;
   document.getElementById("debt-tasaEA").value = debt.tasaEA || 0;
   document.getElementById("debt-pago").value = debt.pago || "";
-  document.getElementById("debt-color").value = debt.color || "blue";
   document.getElementById("debt-automaticDebit").checked = Boolean(debt.automaticDebit);
   document.getElementById("debt-debitPaymentsPerMonth").value = debt.debitPaymentsPerMonth || 1;
   document.getElementById("debt-debitStartDate").value = debt.debitStartDate || "";
@@ -382,90 +436,302 @@ window.openDebtModal = (id) => {
   document.getElementById("debt-cuotas-tarjeta").value = debt.cuotasRestantes || "";
   document.getElementById("debt-fechaFin-tarjeta").value = debt.fechaFin || "";
   
+  // Reset and rebuild extra concepts
+  const extraContainer = document.getElementById("debt-refConceptosExtra-container");
+  if (extraContainer) extraContainer.innerHTML = "";
+  if (debt.refConceptosExtra && Array.isArray(debt.refConceptosExtra)) {
+    debt.refConceptosExtra.forEach(c => {
+      window.addRefConceptoExtraRow(c.nombre, c.valor);
+    });
+  }
+  
+  // Load sameValues select
+  const sameValuesSelect = document.getElementById("debt-debitSameValues");
+  if (sameValuesSelect) {
+    sameValuesSelect.value = debt.debitSameValues !== undefined ? String(debt.debitSameValues) : "true";
+  }
+  
   // Run toggles and calculations
   toggleDebtType();
   toggleRefPaymentsAuto();
   updateRefTotalAuto();
   updateRefTotalTarjeta();
   
-  let debits = debt.debits || [];
-  if (!debits || debits.length === 0) {
-    if (debt.debitDay1) {
-      debits = [];
-      debits.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
-      if (debt.debitDay2) debits.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
-    }
-  }
+  // Show delete button
+  const deleteBtn = document.getElementById("debt-delete-btn");
+  if (deleteBtn) deleteBtn.classList.remove("hide");
   
-  toggleDebtAutoFields(debits);
+  // Setup saved debit concepts data
+  const savedDebitData = {
+    debitDay1: debt.debitDay1 || "",
+    debitDay2: debt.debitDay2 || "",
+    debitConcepts1: debt.debitConcepts1 || [],
+    debitConcepts2: debt.debitConcepts2 || []
+  };
+  
+  toggleDebtAutoFields(savedDebitData);
   
   document.getElementById("debt-modal-bg").classList.add("show");
   renderIcons();
+};
+
+function getRefConceptsList() {
+  const list = [];
+  const cap = parseFloat(document.getElementById("debt-refCapital").value) || 0;
+  const int = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
+  const seg = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
+  const otr = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+  
+  if (cap > 0) list.push({ nombre: "Abono a capital", valor: cap });
+  if (int > 0) list.push({ nombre: "Intereses corrientes", valor: int });
+  if (seg > 0) list.push({ nombre: "Seguro vida deudor", valor: seg });
+  if (otr > 0) list.push({ nombre: "Otros conceptos", valor: otr });
+  
+  const extraRows = document.querySelectorAll(".ref-concepto-extra-row");
+  extraRows.forEach(row => {
+    const nameInput = row.querySelector(".ref-concepto-extra-name");
+    const valInput = row.querySelector(".ref-concepto-extra-value");
+    if (nameInput && valInput) {
+      const name = nameInput.value.trim();
+      const val = parseFloat(valInput.value) || 0;
+      if (name && val > 0) {
+        list.push({ nombre: name, valor: val });
+      }
+    }
+  });
+  return list;
 }
 
-window.toggleDebtAutoFields = (debitsToLoad) => {
-  const auto = document.getElementById("debt-automaticDebit").checked;
-  const debt = editingDebtId ? debtsState.find(d => d.id === editingDebtId) : null;
-  const isAbonoParcial = debt ? Boolean(debt.abonoParcial) : false;
+function harvestDebitConfigFromDOM() {
+  const data = {
+    day1: null,
+    day2: null,
+    concepts1: [],
+    concepts2: []
+  };
   
-  // Mostrar contenedor de campos si es debito automático o si admite abono parcial
-  const showFields = auto || isAbonoParcial;
-  document.getElementById("debt-auto-fields").classList.toggle("hide", !showFields);
+  const d1Input = document.getElementById("debt-debit-day-1");
+  if (d1Input) data.day1 = parseInt(d1Input.value, 10) || null;
   
-  // Mostrar fecha de inicio de débito automático solo si es automático real
-  document.getElementById("debt-auto-start-date-field").classList.toggle("hide", !auto);
+  const d2Input = document.getElementById("debt-debit-day-2");
+  if (d2Input) data.day2 = parseInt(d2Input.value, 10) || null;
   
-  if (!showFields) return;
+  const c1Rows = document.querySelectorAll(".debit-c1-concept-row");
+  c1Rows.forEach(row => {
+    const name = row.dataset.name;
+    const input = row.querySelector(".debit-c1-concept-val");
+    if (name && input) {
+      data.concepts1.push({ nombre: name, valor: parseFloat(input.value) || 0 });
+    }
+  });
+  
+  const c2Rows = document.querySelectorAll(".debit-c2-concept-row");
+  c2Rows.forEach(row => {
+    const name = row.dataset.name;
+    const input = row.querySelector(".debit-c2-concept-val");
+    if (name && input) {
+      data.concepts2.push({ nombre: name, valor: parseFloat(input.value) || 0 });
+    }
+  });
+  
+  return data;
+}
+
+window.renderDebitCuotasConfig = (savedData = null) => {
+  const container = document.getElementById("debt-debit-cuotas-config-container");
+  if (!container) return;
   
   const payments = Number(document.getElementById("debt-debitPaymentsPerMonth").value) || 1;
-  const container = document.getElementById("debt-debits-container");
+  const sameValues = document.getElementById("debt-debitSameValues").value === "true";
   
-  if (payments <= 0) {
-    showToast("El número de cuotas debe ser mayor a 0", true);
-    return;
+  // Get current reference concepts
+  const refConcepts = getRefConceptsList();
+  
+  // Harvest current DOM values to preserve user inputs
+  const currentDOM = harvestDebitConfigFromDOM();
+  
+  // Determine days and concepts
+  let day1 = savedData ? savedData.debitDay1 : (currentDOM.day1 || "");
+  let day2 = savedData ? savedData.debitDay2 : (currentDOM.day2 || "");
+  
+  let concepts1 = [];
+  let concepts2 = [];
+  
+  if (savedData && savedData.debitConcepts1 && savedData.debitConcepts1.length > 0) {
+    concepts1 = savedData.debitConcepts1;
+  } else {
+    // Merge refConcepts with current DOM
+    concepts1 = refConcepts.map(ref => {
+      const existing = currentDOM.concepts1.find(c => c.nombre === ref.nombre);
+      return {
+        nombre: ref.nombre,
+        valor: existing ? existing.valor : ref.valor
+      };
+    });
   }
   
-  // Si no se pasaron cuotas cargadas, intentar obtenerlas de la deuda actual si el contenedor está vacío
-  if (!debitsToLoad && debt) {
-    debitsToLoad = debt.debits || [];
-    if ((!debitsToLoad || debitsToLoad.length === 0) && debt.debitDay1) {
-      debitsToLoad = [];
-      debitsToLoad.push({ day: debt.debitDay1, amount: debt.debitAmount1 || 0 });
-      if (debt.debitDay2) debitsToLoad.push({ day: debt.debitDay2, amount: debt.debitAmount2 || 0 });
+  if (!sameValues && payments === 2) {
+    if (savedData && savedData.debitConcepts2 && savedData.debitConcepts2.length > 0) {
+      concepts2 = savedData.debitConcepts2;
+    } else {
+      concepts2 = refConcepts.map(ref => {
+        const existing = currentDOM.concepts2.find(c => c.nombre === ref.nombre);
+        return {
+          nombre: ref.nombre,
+          valor: existing ? existing.valor : ref.valor
+        };
+      });
     }
   }
   
   let html = "";
-  for (let i = 1; i <= payments; i++) {
-    let day = "";
-    let amount = "";
-    if (debitsToLoad && debitsToLoad[i - 1]) {
-      day = debitsToLoad[i - 1].day || "";
-      amount = debitsToLoad[i - 1].amount || "";
-    } else {
-      // Intentar preservar lo que el usuario ya digitó en el DOM antes de reconstruir
-      const existingDayInput = container.querySelector(`.debt-debit-day[data-index="${i}"]`);
-      const existingAmountInput = container.querySelector(`.debt-debit-amount[data-index="${i}"]`);
-      if (existingDayInput) day = existingDayInput.value;
-      if (existingAmountInput) amount = existingAmountInput.value;
+  
+  if (sameValues) {
+    html += `
+      <div style="background: var(--bg-elev); padding: 12px; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 12px;">
+        <div style="font-weight: bold; color: var(--text); margin-bottom: 10px; font-size: 13px;">Días de Pago</div>
+        <div class="field compact-field">
+          <div class="field-label">Día de pago Cuota 1</div>
+          <input type="number" id="debt-debit-day-1" min="1" max="31" value="${day1}" placeholder="Ej: 1" style="font-family: var(--f-mono);">
+        </div>
+    `;
+    
+    if (payments === 2) {
+      html += `
+        <div class="field compact-field">
+          <div class="field-label">Día de pago Cuota 2</div>
+          <input type="number" id="debt-debit-day-2" min="1" max="31" value="${day2}" placeholder="Ej: 15" style="font-family: var(--f-mono);">
+        </div>
+      `;
     }
     
-    const labelPrefix = auto ? `Cuota ${i}` : `Quincena ${i}`;
-    const amountLabel = auto ? `monto (COP)` : `monto total a descontar (COP)`;
+    html += `
+      </div>
+      <div style="background: var(--bg-elev); padding: 12px; border-radius: 10px; border: 1px solid var(--line);">
+        <div style="font-weight: bold; color: var(--text); margin-bottom: 10px; font-size: 13px;">Conceptos y Valores (Únicos)</div>
+        <div id="debit-c1-concepts-list">
+    `;
+    
+    concepts1.forEach(c => {
+      html += `
+        <div class="flex-row debit-c1-concept-row" data-name="${c.nombre}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <span style="font-size: 13px; color: var(--text-2); flex: 2;">${c.nombre}</span>
+          <input type="number" class="debit-c1-concept-val" value="${c.valor}" oninput="updateDebitTotal(1)" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: right; font-family: var(--f-mono); font-size: 13px;">
+        </div>
+      `;
+    });
+    
+    const total1 = concepts1.reduce((sum, c) => sum + c.valor, 0);
     
     html += `
-      <div class="field">
-        <div class="field-label">${labelPrefix}: día del mes</div>
-        <input type="number" inputmode="numeric" class="debt-debit-day" data-index="${i}" min="1" max="31" value="${day}" placeholder="1">
-      </div>
-      <div class="field">
-        <div class="field-label">${labelPrefix}: ${amountLabel}</div>
-        <input type="number" inputmode="numeric" class="debt-debit-amount" data-index="${i}" value="${amount}" placeholder="0">
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px;">
+          <span style="font-weight: bold; font-size: 13px; color: var(--text);">Total Cuota</span>
+          <input type="number" id="debit-total-1" readonly value="${total1}" style="width: 120px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); text-align: right; font-family: var(--f-mono); font-weight: bold; font-size: 13px;">
+        </div>
       </div>
     `;
+  } else {
+    html += `
+      <div style="background: var(--bg-elev); padding: 12px; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 12px;">
+        <div style="font-weight: bold; color: var(--gold); margin-bottom: 10px; font-size: 13px;">Cuota 1</div>
+        <div class="field compact-field">
+          <div class="field-label">Día de pago</div>
+          <input type="number" id="debt-debit-day-1" min="1" max="31" value="${day1}" placeholder="Ej: 1" style="font-family: var(--f-mono);">
+        </div>
+        <div id="debit-c1-concepts-list" style="margin-top: 10px;">
+    `;
+    
+    concepts1.forEach(c => {
+      html += `
+        <div class="flex-row debit-c1-concept-row" data-name="${c.nombre}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <span style="font-size: 13px; color: var(--text-2); flex: 2;">${c.nombre}</span>
+          <input type="number" class="debit-c1-concept-val" value="${c.valor}" oninput="updateDebitTotal(1)" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: right; font-family: var(--f-mono); font-size: 13px;">
+        </div>
+      `;
+    });
+    
+    const total1 = concepts1.reduce((sum, c) => sum + c.valor, 0);
+    
+    html += `
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px;">
+          <span style="font-weight: bold; font-size: 13px; color: var(--text);">Total Cuota 1</span>
+          <input type="number" id="debit-total-1" readonly value="${total1}" style="width: 120px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); text-align: right; font-family: var(--f-mono); font-weight: bold; font-size: 13px;">
+        </div>
+      </div>
+    `;
+    
+    if (payments === 2) {
+      html += `
+        <div style="background: var(--bg-elev); padding: 12px; border-radius: 10px; border: 1px solid var(--line);">
+          <div style="font-weight: bold; color: var(--gold); margin-bottom: 10px; font-size: 13px;">Cuota 2</div>
+          <div class="field compact-field">
+            <div class="field-label">Día de pago</div>
+            <input type="number" id="debt-debit-day-2" min="1" max="31" value="${day2}" placeholder="Ej: 15" style="font-family: var(--f-mono);">
+          </div>
+          <div id="debit-c2-concepts-list" style="margin-top: 10px;">
+      `;
+      
+      concepts2.forEach(c => {
+        html += `
+          <div class="flex-row debit-c2-concept-row" data-name="${c.nombre}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <span style="font-size: 13px; color: var(--text-2); flex: 2;">${c.nombre}</span>
+            <input type="number" class="debit-c2-concept-val" value="${c.valor}" oninput="updateDebitTotal(2)" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: right; font-family: var(--f-mono); font-size: 13px;">
+          </div>
+        `;
+      });
+      
+      const total2 = concepts2.reduce((sum, c) => sum + c.valor, 0);
+      
+      html += `
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px;">
+            <span style="font-weight: bold; font-size: 13px; color: var(--text);">Total Cuota 2</span>
+            <input type="number" id="debit-total-2" readonly value="${total2}" style="width: 120px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); text-align: right; font-family: var(--f-mono); font-weight: bold; font-size: 13px;">
+          </div>
+        </div>
+      `;
+    }
   }
+  
   container.innerHTML = html;
   renderIcons();
+};
+
+window.updateDebitTotal = (index) => {
+  const rows = document.querySelectorAll(index === 1 ? ".debit-c1-concept-val" : ".debit-c2-concept-val");
+  let sum = 0;
+  rows.forEach(r => {
+    sum += parseFloat(r.value) || 0;
+  });
+  const totalInput = document.getElementById(index === 1 ? "debit-total-1" : "debit-total-2");
+  if (totalInput) {
+    totalInput.value = sum;
+  }
+};
+
+function syncDebitFieldsFromRef() {
+  const auto = document.getElementById("debt-automaticDebit").checked;
+  if (auto) {
+    window.renderDebitCuotasConfig();
+  }
+}
+
+window.handleDebitPaymentsPerMonthChange = () => {
+  window.renderDebitCuotasConfig();
+};
+
+window.handleSameValuesChange = () => {
+  window.renderDebitCuotasConfig();
+};
+
+window.toggleDebtAutoFields = (savedDebitData = null) => {
+  const auto = document.getElementById("debt-automaticDebit").checked;
+  document.getElementById("debt-section-auto").classList.toggle("hide", !auto);
+  if (auto) {
+    window.renderDebitCuotasConfig(savedDebitData);
+  }
 };
 
 window.saveDebt = async () => {
@@ -478,36 +744,72 @@ window.saveDebt = async () => {
   const saldo = parseFloat(document.getElementById("debt-saldo").value);
   const tasaEA = parseFloat(document.getElementById("debt-tasaEA").value);
   const pago = document.getElementById("debt-pago").value.trim();
-  const color = document.getElementById("debt-color").value;
+  
+  // Asignación de color: conserva el color existente o asigna uno aleatorio
+  let color = debt.color;
+  if (!color) {
+    const palette = ['blue', 'emerald', 'amber', 'sky', 'purple', 'pink'];
+    color = palette[Math.floor(Math.random() * palette.length)];
+  }
+  
   const automaticDebit = document.getElementById("debt-automaticDebit").checked;
-  const debitPaymentsPerMonth = Number(document.getElementById("debt-debitPaymentsPerMonth").value);
   const debitStartDate = document.getElementById("debt-debitStartDate").value || null;
+  const debitPaymentsPerMonth = Number(document.getElementById("debt-debitPaymentsPerMonth").value) || 1;
+  const debitSameValues = document.getElementById("debt-debitSameValues").value === "true";
   
   if (!nombre || isNaN(saldo) || !pago) {
     showToast("Completa nombre, saldo y descripción de pago", true);
     return;
   }
   
-  // Recopilar datos de las cuotas dinámicas de débito automático si aplica
-  let debits = [];
-  const hasPaymentConfig = automaticDebit || (type === "automatico" && debt.abonoParcial);
-  if (hasPaymentConfig) {
-    const dayInputs = document.querySelectorAll(".debt-debit-day");
-    const amountInputs = document.querySelectorAll(".debt-debit-amount");
-    for (let i = 0; i < dayInputs.length; i++) {
-      const day = Number(dayInputs[i].value) || 1;
-      const amount = parseFloat(amountInputs[i].value) || 0;
-      if (day >= 1 && day <= 31 && amount > 0) {
-        debits.push({ day: Math.max(1, Math.min(31, day)), amount });
+  let debitDay1 = 0;
+  let debitDay2 = 0;
+  let debitAmount1 = 0;
+  let debitAmount2 = 0;
+  let debitConcepts1 = [];
+  let debitConcepts2 = [];
+  
+  if (automaticDebit) {
+    const day1Input = document.getElementById("debt-debit-day-1");
+    debitDay1 = day1Input ? parseInt(day1Input.value, 10) || 1 : 1;
+    
+    // Conceptos Cuota 1
+    const c1Rows = document.querySelectorAll(".debit-c1-concept-row");
+    c1Rows.forEach(row => {
+      const name = row.dataset.name;
+      const valInput = row.querySelector(".debit-c1-concept-val");
+      if (name && valInput) {
+        debitConcepts1.push({ nombre: name, valor: parseFloat(valInput.value) || 0 });
       }
+    });
+    debitAmount1 = debitConcepts1.reduce((sum, c) => sum + c.valor, 0);
+    
+    if (debitPaymentsPerMonth === 2) {
+      const day2Input = document.getElementById("debt-debit-day-2");
+      debitDay2 = day2Input ? parseInt(day2Input.value, 10) || 15 : 15;
+      
+      if (debitSameValues) {
+        debitConcepts2 = JSON.parse(JSON.stringify(debitConcepts1));
+        debitAmount2 = debitAmount1;
+      } else {
+        const c2Rows = document.querySelectorAll(".debit-c2-concept-row");
+        c2Rows.forEach(row => {
+          const name = row.dataset.name;
+          const valInput = row.querySelector(".debit-c2-concept-val");
+          if (name && valInput) {
+            debitConcepts2.push({ nombre: name, valor: parseFloat(valInput.value) || 0 });
+          }
+        });
+        debitAmount2 = debitConcepts2.reduce((sum, c) => sum + c.valor, 0);
+      }
+    }
+    
+    if (debitAmount1 <= 0 && (debitPaymentsPerMonth === 1 || debitAmount2 <= 0)) {
+      showToast("Define un monto de débito automático válido", true);
+      return;
     }
   }
   
-  if (automaticDebit && debits.length === 0) {
-    showToast("Define al menos una cuota de débito automático con día y monto válidos", true);
-    return;
-  }
-
   let payload = {
     ...debt,
     nombre,
@@ -517,20 +819,41 @@ window.saveDebt = async () => {
     color,
     debtType: type,
     automaticDebit,
-    debitPaymentsPerMonth: automaticDebit ? debits.length : 1,
-    debits: automaticDebit ? debits : [],
     debitStartDate: automaticDebit ? debitStartDate : null,
-    debitDay1: debits[0] ? debits[0].day : 0,
-    debitAmount1: debits[0] ? debits[0].amount : 0,
-    debitDay2: debits[1] ? debits[1].day : 0,
-    debitAmount2: debits[1] ? debits[1].amount : 0,
+    debitPaymentsPerMonth: automaticDebit ? debitPaymentsPerMonth : 1,
+    debitSameValues: automaticDebit ? debitSameValues : true,
+    debitDay1: automaticDebit ? debitDay1 : 0,
+    debitAmount1: automaticDebit ? debitAmount1 : 0,
+    debitDay2: automaticDebit ? debitDay2 : 0,
+    debitAmount2: automaticDebit ? debitAmount2 : 0,
+    debitConcepts1: automaticDebit ? debitConcepts1 : [],
+    debitConcepts2: automaticDebit ? debitConcepts2 : [],
+    debits: automaticDebit ? [
+      { day: debitDay1, amount: debitAmount1 },
+      ...(debitPaymentsPerMonth === 2 ? [{ day: debitDay2, amount: debitAmount2 }] : [])
+    ] : []
   };
-
+  
   if (type === "automatico") {
     const refCapital = parseFloat(document.getElementById("debt-refCapital").value) || 0;
     const refIntereses = parseFloat(document.getElementById("debt-refIntereses-auto").value) || 0;
     const refSeguro = parseFloat(document.getElementById("debt-refSeguro").value) || 0;
     const refOtros = parseFloat(document.getElementById("debt-refOtros").value) || 0;
+    
+    // Obtener conceptos extra
+    const refConceptosExtra = [];
+    const extraRows = document.querySelectorAll(".ref-concepto-extra-row");
+    extraRows.forEach(row => {
+      const nameInput = row.querySelector(".ref-concepto-extra-name");
+      const valInput = row.querySelector(".ref-concepto-extra-value");
+      if (nameInput && valInput) {
+        const nombreExtra = nameInput.value.trim();
+        const valorExtra = parseFloat(valInput.value) || 0;
+        if (nombreExtra && valorExtra > 0) {
+          refConceptosExtra.push({ nombre: nombreExtra, valor: valorExtra });
+        }
+      }
+    });
     
     const numPayments = Number(document.getElementById("debt-paymentsMonth-auto").value) || 1;
     const abonoParcial = document.getElementById("debt-abonoParcial").checked;
@@ -538,17 +861,12 @@ window.saveDebt = async () => {
     const fechaFin = document.getElementById("debt-fechaFin-auto").value || null;
     
     let cuotaMensual = 0;
-    let debitAmount1 = 0;
-    let debitAmount2 = 0;
-    
     if (numPayments === 2) {
-      debitAmount1 = parseFloat(document.getElementById("debt-debitAmount1-auto").value) || 0;
-      debitAmount2 = parseFloat(document.getElementById("debt-debitAmount2-auto").value) || 0;
-      cuotaMensual = debitAmount1 + debitAmount2;
+      const val1 = parseFloat(document.getElementById("debt-debitAmount1-auto").value) || 0;
+      const val2 = parseFloat(document.getElementById("debt-debitAmount2-auto").value) || 0;
+      cuotaMensual = val1 + val2;
     } else {
       cuotaMensual = parseFloat(document.getElementById("debt-cuotaMensual-auto").value) || 0;
-      debitAmount1 = cuotaMensual;
-      debitAmount2 = 0;
     }
     
     payload = {
@@ -557,17 +875,15 @@ window.saveDebt = async () => {
       refIntereses,
       refSeguro,
       refOtros,
+      refConceptosExtra,
       refAbono: 0,
       abonoParcial,
-      debitPaymentsPerMonth: numPayments,
       cuotaMensual,
-      debitAmount1,
-      debitAmount2,
-      cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / cuotaMensual)) : cuotasRestantes,
+      cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / (cuotaMensual || 1))) : cuotasRestantes,
       fechaFin,
     };
   } else {
-    // tarjeta
+    // Tarjeta
     const refAbono = parseFloat(document.getElementById("debt-refAbono").value) || 0;
     const refIntereses = parseFloat(document.getElementById("debt-refIntereses-tarjeta").value) || 0;
     const cuotaMensual = parseFloat(document.getElementById("debt-cuotaMensual-tarjeta").value) || 0;
@@ -581,13 +897,14 @@ window.saveDebt = async () => {
       refCapital: 0,
       refSeguro: 0,
       refOtros: 0,
+      refConceptosExtra: [],
       abonoParcial: false,
       cuotaMensual,
-      cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / cuotaMensual)) : cuotasRestantes,
+      cuotasRestantes: isNaN(cuotasRestantes) ? Math.max(0, Math.ceil(saldo / (cuotaMensual || 1))) : cuotasRestantes,
       fechaFin,
     };
   }
-
+  
   try {
     await setDoc(doc(db, "users", currentUser.uid, "debts", debt.id), payload);
     showToast("Deuda actualizada");
@@ -596,7 +913,7 @@ window.saveDebt = async () => {
   } catch (e) {
     showToast("Error al guardar deuda", true);
   }
-};;
+};
 
 window.closeDebtModal = () => {
   document.getElementById("debt-modal-bg").classList.remove("show");
