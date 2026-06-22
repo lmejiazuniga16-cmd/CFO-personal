@@ -399,10 +399,35 @@ window.setDebitSameValues = (val) => {
 
 window.openDebtModal = (id) => {
   editingDebtId = id;
-  const debt = debtsState.find(d => d.id === id);
-  if (!debt) return;
   
-  document.getElementById("debt-modal-title").textContent = `Editar deuda`;
+  let debt;
+  if (id === 'nueva') {
+    debt = {
+      nombre: "",
+      saldo: 0,
+      tasaEA: 0,
+      pago: "",
+      abonoParcial: false,
+      automaticDebit: false,
+      debitPaymentsPerMonth: 1,
+      debitStartDate: "",
+      debitSameValues: true,
+      refCapital: 0,
+      refIntereses: 0,
+      refSeguro: 0,
+      refOtros: 0,
+      cuotasRestantes: "",
+      fechaFin: "",
+      refAbono: 0,
+      refConceptosExtra: [],
+      debtType: "automatico"
+    };
+    document.getElementById("debt-modal-title").textContent = `Nueva Deuda`;
+  } else {
+    debt = debtsState.find(d => d.id === id);
+    if (!debt) return;
+    document.getElementById("debt-modal-title").textContent = `Editar deuda`;
+  }
   
   const type = debt.debtType || "automatico";
   document.getElementById("debt-type").value = type;
@@ -452,7 +477,9 @@ window.openDebtModal = (id) => {
   
   // Show delete button
   const deleteBtn = document.getElementById("debt-delete-btn");
-  if (deleteBtn) deleteBtn.classList.remove("hide");
+  if (deleteBtn) {
+    deleteBtn.classList.toggle("hide", id === 'nueva');
+  }
   
   // Setup saved debit concepts data
   const savedDebitData = {
@@ -743,14 +770,38 @@ window.toggleDebtAutoFields = (savedDebitData = null) => {
 
 window.saveDebt = async () => {
   if (!currentUser || !editingDebtId) return;
-  const debt = debtsState.find(d => d.id === editingDebtId);
-  if (!debt) return;
   
   const type = document.getElementById("debt-type").value;
   const nombre = document.getElementById("debt-name").value.trim();
   const saldo = parseFloat(document.getElementById("debt-saldo").value.replace(/\./g, '').replace(',', '.')) || 0;
   const tasaEA = parseFloat(document.getElementById("debt-tasaEA").value);
   const pago = document.getElementById("debt-pago").value.trim();
+  
+  if (!nombre || isNaN(saldo) || !pago) {
+    showToast("Completa nombre, saldo y descripción de pago", true);
+    return;
+  }
+  
+  let debtId;
+  let debt;
+  if (editingDebtId === 'nueva') {
+    const slugId = nombre.toLowerCase()
+                         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                         .replace(/\s+/g, '-')
+                         .replace(/[^\w\-]/g, '');
+    debtId = slugId;
+    if (debtsState.some(d => d.id === debtId)) {
+      debtId += '-' + Math.floor(Math.random() * 1000);
+    }
+    debt = {
+      id: debtId,
+      saldoOriginal: saldo,
+      color: ['blue', 'emerald', 'amber', 'sky', 'purple', 'pink'][Math.floor(Math.random() * 6)]
+    };
+  } else {
+    debt = debtsState.find(d => d.id === editingDebtId);
+    if (!debt) return;
+  }
   
   // Asignación de color: conserva el color existente o asigna uno aleatorio
   let color = debt.color;
@@ -947,7 +998,7 @@ window.saveDebt = async () => {
   
   try {
     await setDoc(doc(db, "users", currentUser.uid, "debts", debt.id), payload);
-    showToast("Deuda actualizada");
+    showToast(editingDebtId === 'nueva' ? "Deuda creada" : "Deuda actualizada");
     closeDebtModal();
     await loadDebtsState(currentUser.uid);
   } catch (e) {
@@ -2569,3 +2620,29 @@ const moneyObserver = new MutationObserver((mutations) => {
   });
 });
 moneyObserver.observe(document.body, { childList: true, subtree: true });
+
+// ============================================================
+// MENÚ ACCIONES FLOTANTE (FAB)
+// ============================================================
+window.toggleFabMenu = () => {
+  const btn = document.getElementById("fab-main-btn");
+  const menu = document.getElementById("fab-menu");
+  if (!btn || !menu) return;
+  
+  const isOpen = menu.classList.toggle("show");
+  btn.classList.toggle("active", isOpen);
+};
+
+// Cerrar menú al hacer clic afuera
+document.addEventListener("click", (e) => {
+  const container = document.getElementById("fab-container");
+  const menu = document.getElementById("fab-menu");
+  const btn = document.getElementById("fab-main-btn");
+  if (container && menu && btn) {
+    if (!container.contains(e.target) && menu.classList.contains("show")) {
+      menu.classList.remove("show");
+      btn.classList.remove("active");
+    }
+  }
+});
+

@@ -603,18 +603,66 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 .nav-item.active svg.lucide{transform:translateY(-1px);}
 .nav-item.active::before{content:"";position:absolute;top:-9px;width:22px;height:3px;border-radius:0 0 4px 4px;background:var(--brand);}
 
-.fab{
+.fab-container {
   position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));
   right:max(18px,calc(50% - 234px));z-index:60;
+  display:flex;flex-direction:column;align-items:flex-end;
+}
+.fab{
   width:54px;height:54px;border-radius:18px;
   background:linear-gradient(150deg,var(--brand),var(--brand-2));color:var(--brand-ink);
   display:flex;align-items:center;justify-content:center;
   box-shadow:0 10px 26px -8px rgba(52,221,160,0.55);
-  transition:transform .12s var(--ease),box-shadow .2s;
+  transition:transform .25s var(--ease),box-shadow .2s,background .25s var(--ease),color .25s var(--ease);
+  cursor:pointer;
 }
 .fab svg.lucide{width:25px;height:25px;stroke-width:2.4;}
 .fab:active{transform:scale(0.92);}
 .fab:hover{box-shadow:0 14px 32px -8px rgba(52,221,160,0.7);}
+.fab.active {
+  transform:rotate(135deg);
+  background:var(--surface-3);
+  color:var(--text-2);
+  box-shadow:none;
+}
+.fab-menu {
+  display:flex;flex-direction:column;align-items:flex-end;gap:12px;margin-bottom:14px;
+  opacity:0;visibility:hidden;transform:translateY(15px) scale(0.9);
+  transition:transform .25s var(--ease),opacity .25s var(--ease),visibility .25s var(--ease);
+  pointer-events:none;
+}
+.fab-menu.show {
+  opacity:1;visibility:visible;transform:translateY(0) scale(1);
+  pointer-events:auto;
+}
+.fab-item {
+  display:flex;align-items:center;justify-content:center;
+  width:44px;height:44px;border-radius:14px;cursor:pointer;
+  box-shadow:var(--shadow-1);position:relative;
+  transition:transform .15s var(--ease);
+}
+.fab-item:active {
+  transform:scale(0.92);
+}
+.fab-item svg.lucide {
+  width:19px;height:19px;
+}
+.fab-label {
+  position:absolute;right:56px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+  font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;white-space:nowrap;
+  box-shadow:var(--shadow-1);opacity:0;transform:translateX(8px);
+  transition:opacity .18s var(--ease),transform .18s var(--ease);
+  pointer-events:none;
+}
+.fab-menu.show .fab-label {
+  opacity:1;transform:translateX(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fab, .fab-menu, .fab-item, .fab-label {
+    transition:none !important;
+  }
+}
 
 /* ============================================================
    AUTH + LOADER
@@ -872,7 +920,23 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
     </div>
   </main>
 
-  <button class="fab" onclick="openModal('expense')" aria-label="Registrar gasto"><i data-lucide="plus"></i></button>
+  <div class="fab-container" id="fab-container">
+    <div class="fab-menu" id="fab-menu">
+      <button class="fab-item" onclick="openModal('expense'); toggleFabMenu();" style="background: var(--red); color: #fff;" aria-label="Gasto">
+        <span class="fab-label">Gasto</span>
+        <i data-lucide="trending-down"></i>
+      </button>
+      <button class="fab-item" onclick="openModal('income'); toggleFabMenu();" style="background: var(--brand); color: var(--brand-ink);" aria-label="Ingreso">
+        <span class="fab-label">Ingreso</span>
+        <i data-lucide="trending-up"></i>
+      </button>
+      <button class="fab-item" onclick="openDebtModal('nueva'); toggleFabMenu();" style="background: var(--gold); color: #000;" aria-label="Deuda">
+        <span class="fab-label">Deuda</span>
+        <i data-lucide="credit-card"></i>
+      </button>
+    </div>
+    <button class="fab" id="fab-main-btn" onclick="toggleFabMenu()" aria-label="Abrir menú de acción"><i data-lucide="plus"></i></button>
+  </div>
 
   <nav class="bottomnav">
     <div class="bottomnav-inner">
