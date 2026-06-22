@@ -486,6 +486,10 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 }
 .compact-field input, .compact-field select {
   padding: 9px 12px;
+}
+#debt-section-auto input {
+  color: var(--text);
+}
 .pill-btn {
   background: transparent;
   border: none;
@@ -1055,7 +1059,7 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
         
         <div class="field compact-field">
           <div class="field-label">¿Cuántas cuotas se debitan al mes?</div>
-          <input type="number" id="debt-debitPaymentsPerMonth" min="1" step="1" oninput="handleDebitPaymentsPerMonthChange()" placeholder="Ej: 1" style="font-family: var(--f-mono);">
+          <input type="number" id="debt-debitPaymentsPerMonth" min="1" step="1" oninput="cleanNumberInput(this); handleDebitPaymentsPerMonthChange()" onpaste="handleNumberPaste(event)" onfocus="this.select()" placeholder="Ej: 1" style="font-family: var(--f-mono);">
         </div>
         
         <div class="field compact-field">
