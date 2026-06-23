@@ -254,12 +254,15 @@ Luego se actualiza en Firestore y se recarga `renderDebts()`.
 
 ## Lógica del simulador
 
-`runSimulation()` evalúa un monto ingresado para determinar el mejor impacto financiero:
-1. **Prioridad - Liquidar Tarjetas**: Como las deudas de TC (Nubank) no admiten abonos parciales, se recomienda liquidarlas por completo en orden de saldo ascendente si el monto lo cubre.
-2. **Comparación de Escenarios (Sobrante o si no alcanza para TC)**: Si no alcanza para liquidar ninguna tarjeta o si queda un excedente tras liquidar, y existe al menos una deuda que admita abonos parciales (`abonoParcial === true`, ej: Libranza), se presentan dos opciones simultáneas e informativas:
-   - **Opción A (Todo a Libranza)**: Simula aplicar todo el remanente a abonar a capital de la Libranza, proyectando el nuevo saldo, las cuotas mensuales restantes estimadas, la nueva fecha de finalización (calculada con `addMonthsToDate`) y el total de cuotas ahorradas.
-   - **Opción B (Repartir entre metas)**: Distribuye el remanente entre metas de ahorro de forma proporcional. Si es el monto total, reparte 40% Vivienda, 30% Colchón (DALE) y 30% Gasto libre. Si es un excedente de TC, reparte 60% Vivienda y 40% Gasto libre.
-3. Si no existe ninguna deuda que admita abonos parciales, se omite la Opción A y solo se muestra la Opción B.
+`runSimulation()` es una función asíncrona que delega el análisis financiero a la inteligencia artificial mediante la API de Anthropic (`claude-sonnet-4-6`):
+1. **Flujo de Ejecución**:
+   - Al hacer clic en "Simular", se deshabilita el botón `#sim-btn` y se inyecta un loader animado (`.spinner`) en `#sim-result` para indicar el estado de carga.
+   - Se compila el contexto financiero en tiempo real de Marcela: listado de deudas (`debtsState`), ahorros (`ahorrosState`), flujo mensual (`INGRESO_NETO_MENSUAL` y `FLUJO_LIBRE_MENSUAL`), metas del perfil y restricciones de negocio (las tarjetas no admiten abono parcial, Libranza sí, etc.).
+   - Se envía la información estructurada a Claude solicitando que analice las opciones, diseñe al menos dos escenarios alternativos comparativos y proponga una recomendación final de acción.
+2. **Presentación de la Respuesta**:
+   - La respuesta del modelo en formato Markdown se procesa localmente mediante `parseMarkdownToHTML(texto)`, convirtiendo negritas (`**`), saltos de línea (`\n`), listas con viñetas (`-` / `*`) y títulos (`#`, `##`, `###`) en HTML básico con colores coherentes al tema.
+   - Se habilita de nuevo el botón y se re-renderizan los iconos Lucide (`renderIcons()`).
+
 
 
 ## Configuración de Firebase
