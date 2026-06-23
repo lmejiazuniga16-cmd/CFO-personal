@@ -254,11 +254,13 @@ Luego se actualiza en Firestore y se recarga `renderDebts()`.
 
 ## Lógica del simulador
 
-`runSimulation()` reparte un monto según reglas específicas de la usuaria:
-las tarjetas Nubank **no admiten abono parcial**, así que solo se recomienda pagarlas
-si el monto cubre el saldo total; si no alcanza, reparte entre fondo de vivienda,
-colchón de emergencia y gasto libre. Las cesantías y el ahorro permanente nunca se
-tocan ni se sugieren.
+`runSimulation()` evalúa un monto ingresado para determinar el mejor impacto financiero:
+1. **Prioridad - Liquidar Tarjetas**: Como las deudas de TC (Nubank) no admiten abonos parciales, se recomienda liquidarlas por completo en orden de saldo ascendente si el monto lo cubre.
+2. **Comparación de Escenarios (Sobrante o si no alcanza para TC)**: Si no alcanza para liquidar ninguna tarjeta o si queda un excedente tras liquidar, y existe al menos una deuda que admita abonos parciales (`abonoParcial === true`, ej: Libranza), se presentan dos opciones simultáneas e informativas:
+   - **Opción A (Todo a Libranza)**: Simula aplicar todo el remanente a abonar a capital de la Libranza, proyectando el nuevo saldo, las cuotas mensuales restantes estimadas, la nueva fecha de finalización (calculada con `addMonthsToDate`) y el total de cuotas ahorradas.
+   - **Opción B (Repartir entre metas)**: Distribuye el remanente entre metas de ahorro de forma proporcional. Si es el monto total, reparte 40% Vivienda, 30% Colchón (DALE) y 30% Gasto libre. Si es un excedente de TC, reparte 60% Vivienda y 40% Gasto libre.
+3. Si no existe ninguna deuda que admita abonos parciales, se omite la Opción A y solo se muestra la Opción B.
+
 
 ## Configuración de Firebase
 

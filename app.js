@@ -2376,6 +2376,7 @@ window.runSimulation = () => {
   console.log("debtsState al inicio de runSimulation:", debtsState);
   const monto = parseFloat(document.getElementById("sim-amount").value.replace(/\./g, '').replace(',', '.')) || 0;
   const resultEl = document.getElementById("sim-result");
+  
   if (!monto || monto <= 0) {
     showToast("Escribe un monto válido", true);
     return;
@@ -2391,52 +2392,136 @@ window.runSimulation = () => {
     nubankDrop = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("dropshipping") || d.nombre.toLowerCase().includes("curso")));
   }
   
-  let libranza = debtsState.find(d => d.id === "libranza");
-  if (!libranza) {
-    libranza = debtsState.find(d => d.nombre && d.nombre.toLowerCase().includes("libranza"));
-  }
+  // Buscar deuda con abonoParcial === true (Libranza)
+  const libranza = debtsState.find(d => d.abonoParcial === true);
 
   if (!debtsState || debtsState.length === 0 || !nubankPortatil || !nubankDrop) {
     showToast("No se encontraron las deudas necesarias para simular", true);
     return;
   }
 
+  // Local helper for date adding
+  const addMonthsToDate = (dateStr, months) => {
+    const date = new Date(dateStr + "T12:00:00");
+    const day = date.getDate();
+    date.setMonth(date.getMonth() + months);
+    if (date.getDate() !== day) {
+      date.setDate(0);
+    }
+    return date.toISOString().split("T")[0];
+  };
+
   let plan = [];
   let restante = monto;
-  let nota = "";
+  let recommendationNote = "";
 
   // ¿Alcanza para saldar Nubank portátil completo? (la de menor saldo primero)
   if (nubankPortatil && restante >= nubankPortatil.saldo) {
     plan.push({ destino: `Saldar Nubank Portátil (saldo total)`, valor: nubankPortatil.saldo });
     restante -= nubankPortatil.saldo;
-    nota = `Saldando esta deuda liberas ${fmt(nubankPortatil.cuotaMensual)}/mes de cuota. Como es tarjeta de tu mamá y no admite abono parcial, esta es la única forma de bajarla.`;
+    recommendationNote = `Saldando esta deuda liberas ${fmt(nubankPortatil.cuotaMensual)}/mes de cuota. Como es tarjeta de tu mamá y no admite abono parcial, esta es la única forma de bajarla.`;
   }
   if (nubankDrop && restante >= nubankDrop.saldo) {
     plan.push({ destino: `Saldar Nubank Curso Dropshipping (saldo total)`, valor: nubankDrop.saldo });
     restante -= nubankDrop.saldo;
-    nota += ` También te alcanza para saldar la del curso: +${fmt(nubankDrop.cuotaMensual)}/mes liberados.`;
+    recommendationNote += ` También te alcanza para saldar la del curso: +${fmt(nubankDrop.cuotaMensual)}/mes liberados.`;
   }
 
-  if (plan.length === 0) {
-    // No alcanza para saldar ninguna Nubank → repartir: ahorro vivienda, fondo emergencia, libre
-    const aVivienda = Math.round(restante * 0.4);
-    const aAhorro = Math.round(restante * 0.3);
-    const aLibre = restante - aVivienda - aAhorro;
-    plan.push({ destino: "Fondo para vivienda propia (aparte de cesantías)", valor: aVivienda });
-    plan.push({ destino: "Ahorro / colchón de emergencia (DALE, 10,5% EA)", valor: aAhorro });
-    plan.push({ destino: "Gasto libre / variables del mes", valor: aLibre });
-    nota = `Este monto no alcanza para saldar ninguna Nubank completa (mínimo ${fmt(Math.min(nubankPortatil.saldo, nubankDrop.saldo))}). Recuerda: esas tarjetas no admiten abono parcial, así que mejor acumular hasta poder saldarlas de un solo golpe. Por ahora prioricé vivienda y colchón.`;
-  } else if (restante > 0) {
-    const aVivienda = Math.round(restante * 0.6);
-    const aLibre = restante - aVivienda;
-    plan.push({ destino: "Fondo para vivienda propia", valor: aVivienda });
-    plan.push({ destino: "Gasto libre / disponible", valor: aLibre });
+  let htmlResult = "";
+
+  // 1. Mostrar deudas saldadas si las hay
+  if (plan.length > 0) {
+    htmlResult += `
+      <div style="font-weight: bold; font-size: 14.5px; color: var(--gold); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+        ${iconHtml("check-circle")}Recomendación Principal
+      </div>
+      ${plan.map(p => `<div class="sim-line"><span class="lab">${p.destino}</span><span class="val" style="color: var(--brand); font-weight: bold;">${fmt(p.valor)}</span></div>`).join("")}
+      <div class="sim-note" style="margin-bottom: 20px;">${iconHtml("lightbulb")}<span>${recommendationNote}</span></div>
+    `;
   }
 
-  resultEl.innerHTML = `
-    ${plan.map(p => `<div class="sim-line"><span class="lab">${p.destino}</span><span class="val">${fmt(p.valor)}</span></div>`).join("")}
-    <div class="sim-note">${iconHtml("lightbulb")}<span>${nota}</span></div>
-  `;
+  // 2. Si sobra o si no se saldó ninguna Nubank, mostrar opciones A y B
+  if (restante > 0) {
+    // Si no alcanza para ninguna Nubank, mostrar nota informativa original
+    if (plan.length === 0) {
+      const minNubankSaldo = Math.min(nubankPortatil.saldo, nubankDrop.saldo);
+      htmlResult += `
+        <div class="sim-note" style="margin-bottom: 16px;">
+          ${iconHtml("lightbulb")}
+          <span>Este monto no alcanza para saldar ninguna Nubank completa (mínimo ${fmt(minNubankSaldo)}). Recuerda: esas tarjetas no admiten abono parcial, así que mejor acumular hasta poder saldarlas de un solo golpe. Te presentamos las siguientes alternativas:</span>
+        </div>
+      `;
+    } else {
+      htmlResult += `
+        <div style="font-weight: bold; font-size: 14px; margin-top: 10px; margin-bottom: 8px;">
+          ¿Qué hacer con el excedente de ${fmt(restante)}?
+        </div>
+      `;
+    }
+
+    let optionAHtml = "";
+    if (libranza) {
+      const abonoVal = Math.min(restante, libranza.saldo);
+      const nuevoSaldo = Math.max(0, libranza.saldo - abonoVal);
+      const nuevasCuotas = libranza.cuotaMensual > 0 ? Math.ceil(nuevoSaldo / libranza.cuotaMensual) : 0;
+      const nuevaFechaFin = addMonthsToDate(todayISO(), nuevasCuotas);
+      const ahorroCuotas = Math.max(0, (libranza.cuotasRestantes || 0) - nuevasCuotas);
+      const cuotaLabel = ahorroCuotas === 1 ? "cuota" : "cuotas";
+
+      optionAHtml = `
+        <div class="sim-option-card" style="padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-3); margin-top: 10px;">
+          <div style="font-weight: bold; color: var(--gold); font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            ${iconHtml("trending-up")}Opción A — Todo a ${libranza.nombre}
+          </div>
+          <div class="sim-line"><span class="lab">Abonar a la deuda</span><span class="val" style="color: var(--brand); font-weight: bold;">${fmt(abonoVal)}</span></div>
+          <div class="sim-line"><span class="lab">Nuevo saldo estimado</span><span class="val">${fmt(nuevoSaldo)}</span></div>
+          <div class="sim-line"><span class="lab">Cuotas restantes</span><span class="val">${nuevasCuotas} meses</span></div>
+          <div class="sim-line"><span class="lab">Fecha estimada fin</span><span class="val">${nuevaFechaFin}</span></div>
+          <div class="sim-line" style="border-bottom: none;"><span class="lab">Ahorro en tiempo</span><span class="val" style="color: var(--gold); font-weight: bold;">Te ahorrarías ${ahorroCuotas} ${cuotaLabel}</span></div>
+        </div>
+      `;
+    }
+
+    let optionBHtml = "";
+    if (plan.length === 0) {
+      // Reparto original: 40% vivienda, 30% colchón DALE, 30% libre
+      const aVivienda = Math.round(restante * 0.4);
+      const aAhorro = Math.round(restante * 0.3);
+      const aLibre = restante - aVivienda - aAhorro;
+      optionBHtml = `
+        <div class="sim-option-card" style="padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-3); margin-top: 10px;">
+          <div style="font-weight: bold; color: var(--brand); font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            ${iconHtml("layers")}Opción B — Repartir entre metas
+          </div>
+          <div class="sim-line"><span class="lab">Fondo para vivienda propia (aparte de cesantías)</span><span class="val">${fmt(aVivienda)}</span></div>
+          <div class="sim-line"><span class="lab">Ahorro / colchón de emergencia (DALE, 10,5% EA)</span><span class="val">${fmt(aAhorro)}</span></div>
+          <div class="sim-line" style="border-bottom: none;"><span class="lab">Gasto libre / variables del mes</span><span class="val">${fmt(aLibre)}</span></div>
+        </div>
+      `;
+    } else {
+      // Reparto sobrante: 60% vivienda, 40% libre
+      const aVivienda = Math.round(restante * 0.6);
+      const aLibre = restante - aVivienda;
+      optionBHtml = `
+        <div class="sim-option-card" style="padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-3); margin-top: 10px;">
+          <div style="font-weight: bold; color: var(--brand); font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            ${iconHtml("layers")}Opción B — Repartir sobrante entre metas
+          </div>
+          <div class="sim-line"><span class="lab">Fondo para vivienda propia</span><span class="val">${fmt(aVivienda)}</span></div>
+          <div class="sim-line" style="border-bottom: none;"><span class="lab">Gasto libre / disponible</span><span class="val">${fmt(aLibre)}</span></div>
+        </div>
+      `;
+    }
+
+    htmlResult += `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        ${optionAHtml}
+        ${optionBHtml}
+      </div>
+    `;
+  }
+
+  resultEl.innerHTML = htmlResult;
   resultEl.classList.add("show");
   renderIcons();
 };
