@@ -2372,159 +2372,199 @@ window.addNewCat = async () => {
 // ============================================================
 // SIMULADOR — "¿qué hago con esta plata?"
 // ============================================================
-window.runSimulation = () => {
+window.runSimulation = async () => {
   console.log("debtsState al inicio de runSimulation:", debtsState);
-  const monto = parseFloat(document.getElementById("sim-amount").value.replace(/\./g, '').replace(',', '.')) || 0;
+  const montoInput = document.getElementById("sim-amount");
+  const monto = parseFloat(montoInput.value.replace(/\./g, '').replace(',', '.')) || 0;
   const resultEl = document.getElementById("sim-result");
+  const btn = document.getElementById("sim-btn");
   
   if (!monto || monto <= 0) {
-    showToast("Escribe un monto válido", true);
+    showToast("Ingresa un monto válido", true);
     return;
   }
 
-  let nubankPortatil = debtsState.find(d => d.id === "nubank-portatil");
-  if (!nubankPortatil) {
-    nubankPortatil = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("portatil") || d.nombre.toLowerCase().includes("portátil")));
+  // 1. Mostrar loader y deshabilitar botón
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = "0.6";
+    btn.style.cursor = "not-allowed";
   }
   
-  let nubankDrop = debtsState.find(d => d.id === "nubank-dropshipping");
-  if (!nubankDrop) {
-    nubankDrop = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("dropshipping") || d.nombre.toLowerCase().includes("curso")));
-  }
-  
-  // Buscar deuda con abonoParcial === true (Libranza)
-  const libranza = debtsState.find(d => d.abonoParcial === true);
-
-  if (!debtsState || debtsState.length === 0 || !nubankPortatil || !nubankDrop) {
-    showToast("No se encontraron las deudas necesarias para simular", true);
-    return;
-  }
-
-  // Local helper for date adding
-  const addMonthsToDate = (dateStr, months) => {
-    const date = new Date(dateStr + "T12:00:00");
-    const day = date.getDate();
-    date.setMonth(date.getMonth() + months);
-    if (date.getDate() !== day) {
-      date.setDate(0);
-    }
-    return date.toISOString().split("T")[0];
-  };
-
-  let plan = [];
-  let restante = monto;
-  let recommendationNote = "";
-
-  // ¿Alcanza para saldar Nubank portátil completo? (la de menor saldo primero)
-  if (nubankPortatil && restante >= nubankPortatil.saldo) {
-    plan.push({ destino: `Saldar Nubank Portátil (saldo total)`, valor: nubankPortatil.saldo });
-    restante -= nubankPortatil.saldo;
-    recommendationNote = `Saldando esta deuda liberas ${fmt(nubankPortatil.cuotaMensual)}/mes de cuota. Como es tarjeta de tu mamá y no admite abono parcial, esta es la única forma de bajarla.`;
-  }
-  if (nubankDrop && restante >= nubankDrop.saldo) {
-    plan.push({ destino: `Saldar Nubank Curso Dropshipping (saldo total)`, valor: nubankDrop.saldo });
-    restante -= nubankDrop.saldo;
-    recommendationNote += ` También te alcanza para saldar la del curso: +${fmt(nubankDrop.cuotaMensual)}/mes liberados.`;
-  }
-
-  let htmlResult = "";
-
-  // 1. Mostrar deudas saldadas si las hay
-  if (plan.length > 0) {
-    htmlResult += `
-      <div style="font-weight: bold; font-size: 14.5px; color: var(--gold); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-        ${iconHtml("check-circle")}Recomendación Principal
-      </div>
-      ${plan.map(p => `<div class="sim-line"><span class="lab">${p.destino}</span><span class="val" style="color: var(--brand); font-weight: bold;">${fmt(p.valor)}</span></div>`).join("")}
-      <div class="sim-note" style="margin-bottom: 20px;">${iconHtml("lightbulb")}<span>${recommendationNote}</span></div>
-    `;
-  }
-
-  // 2. Si sobra o si no se saldó ninguna Nubank, mostrar opciones A y B
-  if (restante > 0) {
-    // Si no alcanza para ninguna Nubank, mostrar nota informativa original
-    if (plan.length === 0) {
-      const minNubankSaldo = Math.min(nubankPortatil.saldo, nubankDrop.saldo);
-      htmlResult += `
-        <div class="sim-note" style="margin-bottom: 16px;">
-          ${iconHtml("lightbulb")}
-          <span>Este monto no alcanza para saldar ninguna Nubank completa (mínimo ${fmt(minNubankSaldo)}). Recuerda: esas tarjetas no admiten abono parcial, así que mejor acumular hasta poder saldarlas de un solo golpe. Te presentamos las siguientes alternativas:</span>
-        </div>
-      `;
-    } else {
-      htmlResult += `
-        <div style="font-weight: bold; font-size: 14px; margin-top: 10px; margin-bottom: 8px;">
-          ¿Qué hacer con el excedente de ${fmt(restante)}?
-        </div>
-      `;
-    }
-
-    let optionAHtml = "";
-    if (libranza) {
-      const abonoVal = Math.min(restante, libranza.saldo);
-      const nuevoSaldo = Math.max(0, libranza.saldo - abonoVal);
-      const nuevasCuotas = libranza.cuotaMensual > 0 ? Math.ceil(nuevoSaldo / libranza.cuotaMensual) : 0;
-      const nuevaFechaFin = addMonthsToDate(todayISO(), nuevasCuotas);
-      const ahorroCuotas = Math.max(0, (libranza.cuotasRestantes || 0) - nuevasCuotas);
-      const cuotaLabel = ahorroCuotas === 1 ? "cuota" : "cuotas";
-
-      optionAHtml = `
-        <div class="sim-option-card" style="padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-3); margin-top: 10px;">
-          <div style="font-weight: bold; color: var(--gold); font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            ${iconHtml("trending-up")}Opción A — Todo a ${libranza.nombre}
-          </div>
-          <div class="sim-line"><span class="lab">Abonar a la deuda</span><span class="val" style="color: var(--brand); font-weight: bold;">${fmt(abonoVal)}</span></div>
-          <div class="sim-line"><span class="lab">Nuevo saldo estimado</span><span class="val">${fmt(nuevoSaldo)}</span></div>
-          <div class="sim-line"><span class="lab">Cuotas restantes</span><span class="val">${nuevasCuotas} meses</span></div>
-          <div class="sim-line"><span class="lab">Fecha estimada fin</span><span class="val">${nuevaFechaFin}</span></div>
-          <div class="sim-line" style="border-bottom: none;"><span class="lab">Ahorro en tiempo</span><span class="val" style="color: var(--gold); font-weight: bold;">Te ahorrarías ${ahorroCuotas} ${cuotaLabel}</span></div>
-        </div>
-      `;
-    }
-
-    let optionBHtml = "";
-    if (plan.length === 0) {
-      // Reparto original: 40% vivienda, 30% colchón DALE, 30% libre
-      const aVivienda = Math.round(restante * 0.4);
-      const aAhorro = Math.round(restante * 0.3);
-      const aLibre = restante - aVivienda - aAhorro;
-      optionBHtml = `
-        <div class="sim-option-card" style="padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-3); margin-top: 10px;">
-          <div style="font-weight: bold; color: var(--brand); font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            ${iconHtml("layers")}Opción B — Repartir entre metas
-          </div>
-          <div class="sim-line"><span class="lab">Fondo para vivienda propia (aparte de cesantías)</span><span class="val">${fmt(aVivienda)}</span></div>
-          <div class="sim-line"><span class="lab">Ahorro / colchón de emergencia (DALE, 10,5% EA)</span><span class="val">${fmt(aAhorro)}</span></div>
-          <div class="sim-line" style="border-bottom: none;"><span class="lab">Gasto libre / variables del mes</span><span class="val">${fmt(aLibre)}</span></div>
-        </div>
-      `;
-    } else {
-      // Reparto sobrante: 60% vivienda, 40% libre
-      const aVivienda = Math.round(restante * 0.6);
-      const aLibre = restante - aVivienda;
-      optionBHtml = `
-        <div class="sim-option-card" style="padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-3); margin-top: 10px;">
-          <div style="font-weight: bold; color: var(--brand); font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            ${iconHtml("layers")}Opción B — Repartir sobrante entre metas
-          </div>
-          <div class="sim-line"><span class="lab">Fondo para vivienda propia</span><span class="val">${fmt(aVivienda)}</span></div>
-          <div class="sim-line" style="border-bottom: none;"><span class="lab">Gasto libre / disponible</span><span class="val">${fmt(aLibre)}</span></div>
-        </div>
-      `;
-    }
-
-    htmlResult += `
-      <div style="display: flex; flex-direction: column; gap: 14px;">
-        ${optionAHtml}
-        ${optionBHtml}
-      </div>
-    `;
-  }
-
-  resultEl.innerHTML = htmlResult;
+  resultEl.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; min-height: 120px;">
+      <div class="spinner"></div>
+      <div style="color: var(--text-3); font-size: 13.5px; font-weight: 500;">Analizando tu situación con el asistente...</div>
+    </div>
+  `;
   resultEl.classList.add("show");
-  renderIcons();
+  
+  try {
+    let nubankPortatil = debtsState.find(d => d.id === "nubank-portatil");
+    if (!nubankPortatil) {
+      nubankPortatil = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("portatil") || d.nombre.toLowerCase().includes("portátil")));
+    }
+    
+    let nubankDrop = debtsState.find(d => d.id === "nubank-dropshipping");
+    if (!nubankDrop) {
+      nubankDrop = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("dropshipping") || d.nombre.toLowerCase().includes("curso")));
+    }
+
+    if (!debtsState || debtsState.length === 0 || !nubankPortatil || !nubankDrop) {
+      showToast("No se encontraron las deudas necesarias para simular", true);
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = "";
+        btn.style.cursor = "";
+      }
+      return;
+    }
+
+    // 2. Construir el prompt de sistema + mensaje de usuario
+    const systemPrompt = `Eres el asistente financiero personal de Marcela, una mujer colombiana que trabaja en Banco de Occidente en Palmira, Valle del Cauca. Tu rol es ayudarle a tomar decisiones inteligentes con su dinero disponible.
+
+Responde siempre en español colombiano, de manera cálida pero directa. Sé concreta y específica con los números. Usa pesos colombianos (COP) con formato de puntos de miles.
+
+Cuando Marcela te diga cuánta plata tiene disponible, analiza su situación completa y recomiéndale exactamente qué hacer con ese dinero, considerando:
+- Sus deudas activas y cuál conviene atacar primero
+- Sus metas de ahorro (vivienda propia, colchón de emergencia)
+- Su flujo libre mensual
+- El impacto concreto de cada decisión (cuántas cuotas se ahorraría, nueva fecha fin, nuevo saldo)
+
+Presenta siempre al menos dos escenarios alternativos con sus pros y contras. Termina con una recomendación clara de qué harías tú en su lugar y por qué.`;
+
+    const deudasText = debtsState.map(d => {
+      return `- ${d.nombre}: saldo ${fmt(d.saldo)}, cuota mensual ${fmt(d.cuotaMensual)}, ${d.cuotasRestantes} cuotas restantes, fecha fin estimada ${d.fechaFin || "N/A"}, ${d.abonoParcial ? 'admite abono parcial' : 'NO admite abono parcial'}, tipo: ${d.debtType || "automatico"}`;
+    }).join("\n");
+
+    const ahorrosText = ahorrosState.map(a => {
+      return `- ${a.nombre} (${a.descripcion}): ${fmt(a.valor)}, última actualización: ${a.ultimaActualizacion}`;
+    }).join("\n");
+
+    const userPrompt = `Tengo ${fmt(monto)} disponibles ahora mismo. ¿Qué hago con esta plata?
+
+Mi situación financiera actual:
+
+DEUDAS ACTIVAS:
+${deudasText || "No hay deudas activas registradas."}
+
+AHORROS E INMOVILIZADOS:
+${ahorrosText || "No hay ahorros registrados."}
+
+FLUJO MENSUAL:
+- Ingreso neto mensual: ${fmt(INGRESO_NETO_MENSUAL)}
+- Flujo libre mensual estimado: ${fmt(FLUJO_LIBRE_MENSUAL)}
+
+METAS:
+- Comprar vivienda propia (las cesantías en Porvenir y el fondo de vivienda son para esto)
+- Mantener un colchón de emergencia en cuenta DALE (10,5% EA)
+- Llegar a deuda cero lo antes posible
+
+RESTRICCIONES IMPORTANTES:
+- Las tarjetas de crédito Nubank NO admiten abono parcial — solo se pueden saldar completamente
+- Las cesantías y el ahorro permanente son intocables
+- La Libranza SÍ admite abono parcial a capital`;
+
+    const prompt = `${systemPrompt}\n\n[Mensaje de Marcela]\n${userPrompt}`;
+
+    // 3. Llamada a la API de Anthropic
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const texto = data.content.map(b => b.text || "").join("\n");
+
+    // 4. Renderizar respuesta como HTML básico
+    resultEl.innerHTML = parseMarkdownToHTML(texto);
+    renderIcons();
+
+  } catch (error) {
+    console.error("Error en runSimulation:", error);
+    showToast("No se pudo conectar con el asistente. Intenta de nuevo.", true);
+    resultEl.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--red); font-size: 13.5px;">
+        Error al obtener la recomendación. Por favor intenta de nuevo.
+      </div>
+    `;
+  } finally {
+    // 5. Re-habilitar botón
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = "";
+      btn.style.cursor = "";
+    }
+  }
 };
+
+function parseMarkdownToHTML(md) {
+  if (!md) return "";
+  
+  // Escapar HTML para seguridad
+  let html = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  
+  // Convertir **texto** a <strong>
+  html = html.replace(/\*\*([\s\S]*?)\*\*/g, "<strong>$1</strong>");
+  
+  // Convertir listas con guiones
+  const lines = html.split("\n");
+  let inList = false;
+  let resultLines = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      if (!inList) {
+        inList = true;
+        resultLines.push('<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">');
+      }
+      const itemText = trimmed.substring(2);
+      resultLines.push(`<li>${itemText}</li>`);
+    } else {
+      if (inList) {
+        inList = false;
+        resultLines.push("</ul>");
+      }
+      resultLines.push(rawLine);
+    }
+  }
+  if (inList) {
+    resultLines.push("</ul>");
+  }
+  
+  let joined = resultLines.join("\n");
+  joined = joined.replace(/\n/g, "<br>");
+  
+  // Limpieza de <br> redundantes en listas
+  joined = joined
+    .replace(/<ul([^>]*?)><br>/g, "<ul$1>")
+    .replace(/<\/ul><br>/g, "</ul>")
+    .replace(/<li>(.*?)<\/li><br>/g, "<li>$1</li>");
+    
+  // Convertir encabezados markdown a títulos coloreados
+  joined = joined
+    .replace(/### (.*?)(?:<br>|$)/g, '<h3 style="margin-top: 14px; margin-bottom: 6px; font-size: 14.5px; font-weight: bold; color: var(--gold);">$1</h3>')
+    .replace(/## (.*?)(?:<br>|$)/g, '<h2 style="margin-top: 16px; margin-bottom: 8px; font-size: 16px; font-weight: bold; color: var(--brand);">$1</h2>')
+    .replace(/# (.*?)(?:<br>|$)/g, '<h1 style="margin-top: 18px; margin-bottom: 10px; font-size: 18px; font-weight: bold; color: var(--brand);">$1</h1>');
+    
+  return joined;
+}
 
 // ============================================================
 // MONEDA COLOMBIANA — FORMATO AUTOMÁTICO DE MONTOS
