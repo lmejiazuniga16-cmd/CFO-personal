@@ -1,15 +1,3 @@
-// PROXY PARA LA API DE ANTHROPIC CLAUDE (Netlify Function)
-// Evita el error de CORS al llamar a la API de Anthropic directamente desde el navegador.
-//
-// PASO MANUAL PARA LA USUARIA EN NETLIFY:
-// 1. Ir a https://app.netlify.com
-// 2. Abrir el sitio `cfo-marcela`
-// 3. Ir a Site configuration -> Environment variables
-// 4. Agregar la variable de entorno:
-//    - Key: ANTHROPIC_API_KEY
-//    - Value: Tu clave secreta (empieza con sk-ant-...)
-// 5. Guardar y redesplegar el sitio.
-
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
