@@ -2467,16 +2467,15 @@ RESTRICCIONES IMPORTANTES:
 
     const prompt = `${systemPrompt}\n\n[Mensaje de Marcela]\n${userPrompt}`;
 
-    // 3. Llamada a la API de Anthropic
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    // 3. Llamada a la Netlify Function Proxy
+    const response = await fetch("/.netlify/functions/claude-proxy", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }]
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }]
       })
     });
 
