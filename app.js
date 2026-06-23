@@ -2373,6 +2373,7 @@ window.addNewCat = async () => {
 // SIMULADOR — "¿qué hago con esta plata?"
 // ============================================================
 window.runSimulation = () => {
+  console.log("debtsState al inicio de runSimulation:", debtsState);
   const monto = parseFloat(document.getElementById("sim-amount").value.replace(/\./g, '').replace(',', '.')) || 0;
   const resultEl = document.getElementById("sim-result");
   if (!monto || monto <= 0) {
@@ -2380,9 +2381,25 @@ window.runSimulation = () => {
     return;
   }
 
-  const nubankPortatil = debtsState.find(d => d.id === "nubank-portatil");
-  const nubankDrop = debtsState.find(d => d.id === "nubank-dropshipping");
-  const libranza = debtsState.find(d => d.id === "libranza");
+  let nubankPortatil = debtsState.find(d => d.id === "nubank-portatil");
+  if (!nubankPortatil) {
+    nubankPortatil = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("portatil") || d.nombre.toLowerCase().includes("portátil")));
+  }
+  
+  let nubankDrop = debtsState.find(d => d.id === "nubank-dropshipping");
+  if (!nubankDrop) {
+    nubankDrop = debtsState.find(d => d.nombre && (d.nombre.toLowerCase().includes("dropshipping") || d.nombre.toLowerCase().includes("curso")));
+  }
+  
+  let libranza = debtsState.find(d => d.id === "libranza");
+  if (!libranza) {
+    libranza = debtsState.find(d => d.nombre && d.nombre.toLowerCase().includes("libranza"));
+  }
+
+  if (!debtsState || debtsState.length === 0 || !nubankPortatil || !nubankDrop) {
+    showToast("No se encontraron las deudas necesarias para simular", true);
+    return;
+  }
 
   let plan = [];
   let restante = monto;
