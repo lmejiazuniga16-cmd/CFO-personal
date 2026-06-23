@@ -59,6 +59,8 @@ Despliegue: arrastrar la carpeta a Netlify Drop o publicar con GitHub Pages (ver
 | `firebase-config.js`   | Inicializa Firebase y exporta `auth` y `db`. Contiene las claves.      |
 | `manifest.json`        | Manifiesto PWA (instalable en pantalla de inicio).                     |
 | `assets/icon-*.png`    | Íconos PWA (192/512) usados por el manifest y como favicon.            |
+| `netlify/functions/claude-proxy.js` | Función serverless (proxy) para conectar con la API de Anthropic ocultando la API Key. |
+| `netlify.toml`         | Archivo de configuración que le indica a Netlify dónde se encuentran las funciones. |
 
 ## Arquitectura
 
@@ -254,11 +256,11 @@ Luego se actualiza en Firestore y se recarga `renderDebts()`.
 
 ## Lógica del simulador
 
-`runSimulation()` es una función asíncrona que delega el análisis financiero a la inteligencia artificial mediante la API de Anthropic (`claude-sonnet-4-6`):
+`runSimulation()` es una función asíncrona que delega el análisis financiero a la inteligencia artificial mediante la API de Anthropic (`claude-sonnet-4-6`), comunicándose a través de una función serverless local (`/.netlify/functions/claude-proxy`) para evitar bloqueos por CORS y mantener segura la clave secreta de la API:
 1. **Flujo de Ejecución**:
    - Al hacer clic en "Simular", se deshabilita el botón `#sim-btn` y se inyecta un loader animado (`.spinner`) en `#sim-result` para indicar el estado de carga.
-   - Se compila el contexto financiero en tiempo real de Marcela: listado de deudas (`debtsState`), ahorros (`ahorrosState`), flujo mensual (`INGRESO_NETO_MENSUAL` y `FLUJO_LIBRE_MENSUAL`), metas del perfil y restricciones de negocio (las tarjetas no admiten abono parcial, Libranza sí, etc.).
-   - Se envía la información estructurada a Claude solicitando que analice las opciones, diseñe al menos dos escenarios alternativos comparativos y proponga una recomendación final de acción.
+   - Se compila el contexto financiero en tiempo real de Marcela: listado de deudas (`debtsState`), ahorros (`ahorrosState`), flujo mensual (`INGRESO_NETO_MENSUAL` y `FLUJO_LIBRE_MENSUAL`), metas del perfil y restricciones de negocio.
+   - Se envía la información a `/.netlify/functions/claude-proxy` en un payload JSON estructurado con `system` y `messages`. La función serverless añade la API Key `ANTHROPIC_API_KEY` (guardada en las variables de entorno de Netlify) y la cabecera de versión de Anthropic, realizando la llamada segura al backend de Anthropic.
 2. **Presentación de la Respuesta**:
    - La respuesta del modelo en formato Markdown se procesa localmente mediante `parseMarkdownToHTML(texto)`, convirtiendo negritas (`**`), saltos de línea (`\n`), listas con viñetas (`-` / `*`) y títulos (`#`, `##`, `###`) en HTML básico con colores coherentes al tema.
    - Se habilita de nuevo el botón y se re-renderizan los iconos Lucide (`renderIcons()`).
