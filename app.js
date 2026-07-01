@@ -1758,6 +1758,7 @@ function renderTimeline() {
   }).join("");
   renderIcons();
 }
+window.renderTimeline = renderTimeline;
 
 // ============================================================
 // TRANSACCIONES — listener en tiempo real (esto es lo que
