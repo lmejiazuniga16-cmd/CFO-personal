@@ -1768,7 +1768,10 @@ function listenToTransactions(uid) {
   if (unsubTx) unsubTx();
   const q = query(collection(db, "users", uid, "transactions"), orderBy("fecha", "desc"));
   unsubTx = onSnapshot(q, (snap) => {
-    allTransactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allTransactions = snap.docs.map(d => ({
+  id: d.id,
+  ...d.data()
+}));
     renderAll();
   });
 }
