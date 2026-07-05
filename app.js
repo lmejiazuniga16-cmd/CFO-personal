@@ -196,6 +196,10 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 let periodStart, periodEnd, periodMode;
 let selectedCategory = null;
+let movementFilter = "latest10";
+let movementMonths = [];
+let movementStartDate = "";
+let movementEndDate = "";
 function defaultPeriod() {
   periodStart = "";
   periodEnd = "";
@@ -1972,6 +1976,45 @@ const emptyState = (title, sub, cta) => `
     ${cta ? `<button class="empty-cta" onclick="openModal('expense')">${iconHtml("plus")}Registrar el primero</button>` : ''}
   </div>`;
 
+function getFilteredTransactions() {
+  const base = txInPeriod()
+    .slice()
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  if (movementFilter === "latest10") return base.slice(0, 10);
+  if (movementFilter === "all") return base;
+  if (movementFilter === "months") {
+    if (movementMonths.length === 0) return [];
+    const selectedMonths = new Set(movementMonths);
+    return base.filter(t => selectedMonths.has(new Date(t.fecha + "T12:00:00").getMonth() + 1));
+  }
+  if (movementFilter === "range") {
+    if (!movementStartDate || !movementEndDate) return [];
+    return base.filter(t => t.fecha >= movementStartDate && t.fecha <= movementEndDate);
+  }
+  return base;
+}
+
+function getMovementFilterLabel() {
+  if (movementFilter === "latest10") return "Últimos 10";
+  if (movementFilter === "all") return "Todos";
+  if (movementFilter === "months") {
+    if (movementMonths.length === 0) return "Meses";
+    return movementMonths.map(m => cap(MESES[m - 1])).join(" + ");
+  }
+  if (movementFilter === "range") {
+    if (!movementStartDate || !movementEndDate) return "Rango";
+    return `Del ${movementStartDate} al ${movementEndDate}`;
+  }
+  return "Últimos 10";
+}
+
+function populateMovementFilterMonths() {
+  const wrap = document.getElementById("movement-filter-months");
+  if (!wrap) return;
+  wrap.innerHTML = MESES.map((m, i) => `<label class="movement-month-option"><input type="checkbox" value="${i + 1}"> ${cap(m)}</label>`).join("");
+}
+
 function renderTxPreview() {
   const el = document.getElementById("tx-preview");
   const tx = txInPeriod();
@@ -1989,11 +2032,14 @@ function renderTxPreview() {
 
 function renderTxFull() {
   const el = document.getElementById("tx-full");
-  const tx = txInPeriod();
+  const tx = getFilteredTransactions();
+  const currentFilterLabel = document.getElementById("tx-filter-active");
+  if (currentFilterLabel) currentFilterLabel.textContent = getMovementFilterLabel();
+
   if (tx.length === 0) {
     el.innerHTML = allTransactions.length === 0
       ? emptyState("Sin movimientos todavía", "Cuando registres gastos o ingresos aparecerán todos en esta lista.", true)
-      : emptyState("Sin movimientos en este periodo", "Prueba con otro rango de fechas en el selector de arriba.", false);
+      : emptyState("No existen movimientos para el filtro seleccionado.", "Prueba con otro filtro o cambia el periodo activo.", false);
     renderIcons();
     return;
   }
@@ -2001,6 +2047,62 @@ function renderTxFull() {
   tx.forEach(t => el.appendChild(txItemEl(t)));
   renderIcons();
 }
+
+window.openMovementFilters = () => {
+  populateMovementFilterMonths();
+  document.getElementById("movement-filter-modal-bg").classList.add("show");
+  const active = document.querySelector(`input[name="movement-filter-mode"][value="${movementFilter}"]`);
+  if (active) active.checked = true;
+  document.getElementById("movement-filter-start").value = movementStartDate;
+  document.getElementById("movement-filter-end").value = movementEndDate;
+  document.querySelectorAll(".movement-month-option input").forEach(cb => {
+    cb.checked = movementMonths.includes(Number(cb.value));
+  });
+  updateMovementFilterUI();
+};
+
+window.closeMovementFilters = () => {
+  document.getElementById("movement-filter-modal-bg").classList.remove("show");
+};
+
+function updateMovementFilterUI(mode = movementFilter) {
+  const selectedMode = mode || movementFilter;
+  const active = document.querySelector(`input[name="movement-filter-mode"][value="${selectedMode}"]`);
+  if (active) active.checked = true;
+  const monthsWrap = document.getElementById("movement-filter-months");
+  const rangeWrap = document.getElementById("movement-filter-range");
+  const monthsEnabled = selectedMode === "months";
+  monthsWrap.classList.toggle("hide", !monthsEnabled);
+  rangeWrap.classList.toggle("hide", selectedMode !== "range");
+}
+
+window.setMovementFilterMode = (mode) => {
+  movementFilter = mode;
+  updateMovementFilterUI(mode);
+};
+
+window.applyMovementFilters = () => {
+  const selectedMode = document.querySelector("input[name='movement-filter-mode']:checked")?.value || movementFilter;
+  movementFilter = selectedMode;
+  movementMonths = Array.from(document.querySelectorAll(".movement-month-option input:checked")).map(cb => Number(cb.value));
+  movementStartDate = document.getElementById("movement-filter-start").value;
+  movementEndDate = document.getElementById("movement-filter-end").value;
+  if (movementFilter === "range" && movementStartDate && movementEndDate && movementStartDate > movementEndDate) {
+    showToast("La fecha inicial no puede ser posterior a la final", true);
+    return;
+  }
+  renderTxFull();
+  window.closeMovementFilters();
+};
+
+window.clearMovementFilters = () => {
+  movementFilter = "latest10";
+  movementMonths = [];
+  movementStartDate = "";
+  movementEndDate = "";
+  renderTxFull();
+  window.closeMovementFilters();
+};
 
 function txItemEl(t) {
   const div = document.createElement("div");
@@ -2025,50 +2127,93 @@ function txItemEl(t) {
 
 function renderChart() {
   const el = document.getElementById("chart-bars");
-  const tx = txInPeriod();
-  const ingresos = tx.filter(t => t.tipo === "income").reduce((s, t) => s + t.monto, 0);
-  const gastos = tx.filter(t => t.tipo === "expense").reduce((s, t) => s + t.monto, 0);
-  const balance = ingresos - gastos;
-  const pct = ingresos > 0 ? (gastos / ingresos) * 100 : null;
-  const pctText = ingresos > 0 ? `${pct >= 100 ? pct.toFixed(0) : pct.toFixed(1)}%` : "N/A";
-  const barWidth = ingresos > 0 ? Math.min(100, pct) : 0;
-  const label = periodMode === "all" ? "Todo el historial" : periodLabel();
+  const months = txInPeriod()
+    .filter(t => t.tipo === "income" || t.tipo === "expense")
+    .reduce((acc, t) => {
+      const key = t.fecha.slice(0, 7);
+      if (!acc[key]) {
+        acc[key] = { key, label: new Date(t.fecha + "T12:00:00"), income: 0, expense: 0 };
+      }
+      if (t.tipo === "income") acc[key].income += t.monto;
+      else acc[key].expense += t.monto;
+      return acc;
+    }, {});
+
+  const rows = Object.values(months)
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .filter(item => item.income > 0);
+
+  if (rows.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-ic">${iconHtml("chart-column")}</div><div class="empty-title">Sin datos suficientes</div><div class="empty-sub">No hay ingresos registrados para construir la evolución mensual.</div></div>`;
+    renderIcons();
+    return;
+  }
+
+  const maxPct = Math.max(...rows.map(item => (item.expense / item.income) * 100), 100);
+  const bars = rows.map(item => {
+    const pct = (item.expense / item.income) * 100;
+    let state = "Dentro del presupuesto";
+    let cls = "good";
+    if (pct > 90) {
+      state = "Sobre el presupuesto";
+      cls = "over";
+    } else if (pct >= 70) {
+      state = "En el límite";
+      cls = "warn";
+    }
+    const label = item.label.toLocaleDateString("es-CO", { month: "short", year: "numeric" });
+    const tooltip = `Mes y año: ${label}\nPorcentaje gastado: ${pct.toFixed(1)}%\nEstado: ${state}`;
+    return `
+      <div class="evolution-bar-col">
+        <div class="evolution-bar-wrap">
+          <div class="evolution-bar ${cls}" style="height:${Math.max(8, (pct / maxPct) * 100)}%" title="${tooltip}"></div>
+        </div>
+        <div class="evolution-bar-label">${item.label.toLocaleDateString("es-CO", { month: "short" })}</div>
+      </div>`;
+  }).join("");
 
   el.innerHTML = `
-    <div class="period-summary">
-      <div class="period-summary-head">
-        <div>
-          <div class="period-summary-title">${escapeHtml(label)}</div>
-          <div class="period-summary-sub">Resumen financiero del periodo</div>
-        </div>
-        <div class="period-summary-badge">${periodMode === "all" ? "Historial completo" : "Periodo activo"}</div>
+    <div class="evolution-chart">
+      <div class="evolution-chart-bars">${bars}</div>
+      <div class="evolution-chart-legend">
+        <span class="legend-pill good">≤70%</span>
+        <span class="legend-pill warn">70–90%</span>
+        <span class="legend-pill over">90%+</span>
       </div>
-      <div class="period-summary-grid">
-        <div class="summary-stat positive">
-          <span>Ingresos</span>
-          <strong>${fmt(ingresos)}</strong>
-        </div>
-        <div class="summary-stat negative">
-          <span>Gastos</span>
-          <strong>${fmt(gastos)}</strong>
-        </div>
-        <div class="summary-stat ${balance >= 0 ? 'positive' : 'negative'}">
-          <span>Balance</span>
-          <strong>${fmt(balance)}</strong>
-        </div>
-      </div>
-      <div class="summary-progress" aria-label="Porcentaje del ingreso gastado">
-        <div class="summary-progress-bar ${gastos > ingresos ? 'over' : ''}" style="width:${Math.max(4, Math.min(100, barWidth))}%"></div>
-      </div>
-      <div class="summary-foot">${ingresos > 0 ? `Has gastado el ${pctText} de tus ingresos.` : "Porcentaje: N/A"}</div>
     </div>`;
 }
 
-// ============================================================
-// DONUT — gastos por categoría (en qué se va la plata)
-// Respeta el periodo activo: suma los gastos registrados en el rango.
-// ============================================================
-const PIE_COLORS = ["#34DDA0", "#5BA7F7", "#F2B95C", "#F26A5E", "#A78BFA", "#2DD4BF", "#F472B6", "#A3E635", "#FB923C", "#9AA4B2"];
+function openCategoryDetailModal(category) {
+  const categoryTx = txInPeriod()
+    .filter(t => t.tipo === "expense" && t.categoria === category)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const total = categoryTx.reduce((sum, tx) => sum + tx.monto, 0);
+  const title = document.getElementById("category-detail-title");
+  const totalEl = document.getElementById("category-detail-total");
+  const listEl = document.getElementById("category-detail-list");
+
+  title.textContent = category;
+  totalEl.textContent = fmt(total);
+
+  if (categoryTx.length === 0) {
+    listEl.innerHTML = `<div class="category-detail-empty">No hay movimientos para esta categoría durante este periodo.</div>`;
+  } else {
+    listEl.innerHTML = categoryTx.map(tx => `
+      <div class="category-detail-item">
+        <div class="category-detail-meta">
+          <span class="category-detail-date">${new Date(tx.fecha + "T12:00:00").toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}</span>
+          <span class="category-detail-desc">${escapeHtml(tx.descripcion)}</span>
+        </div>
+        <span class="category-detail-amt">${fmt(tx.monto)}</span>
+      </div>`).join("");
+  }
+
+  document.getElementById("category-detail-modal-bg").classList.add("show");
+}
+
+window.closeCategoryDetailModal = () => {
+  document.getElementById("category-detail-modal-bg").classList.remove("show");
+};
 
 function renderCategoryChart() {
   const el = document.getElementById("cat-chart");
@@ -2082,64 +2227,24 @@ function renderCategoryChart() {
 
   const byCat = {};
   gastos.forEach(t => { byCat[t.categoria] = (byCat[t.categoria] || 0) + t.monto; });
-  const total = Object.values(byCat).reduce((a, b) => a + b, 0);
   const cats = Object.entries(byCat)
-    .map(([name, val]) => ({ name, val, pct: (val / total) * 100 }))
+    .map(([name, val]) => ({ name, val }))
     .sort((a, b) => b.val - a.val);
 
-  if (selectedCategory && !cats.some(c => c.name === selectedCategory)) {
-    selectedCategory = null;
-  }
-
-  let acc = 0;
-  const segs = cats.map((c, i) => {
-    c.color = PIE_COLORS[i % PIE_COLORS.length];
-    const dash = `${c.pct.toFixed(2)} ${(100 - c.pct).toFixed(2)}`;
-    const offset = (-acc).toFixed(2);
-    acc += c.pct;
-    return `<circle class="donut-seg" cx="21" cy="21" r="15.91549431" fill="transparent" stroke="${c.color}" stroke-width="4.5" stroke-dasharray="${dash}" stroke-dashoffset="${offset}"></circle>`;
-  }).join("");
-
-  const legend = cats.map(c => `
-    <button type="button" class="legend-row ${selectedCategory === c.name ? "active" : ""}" data-category="${escapeHtml(c.name)}">
-      <span class="legend-dot" style="background:${c.color}"></span>
-      <span class="legend-name">${escapeHtml(c.name)}</span>
-      <span class="legend-pct">${Math.round(c.pct)}%</span>
-      <span class="legend-amt">${fmt(c.val)}</span>
-    </button>`).join("");
-
-  const detailTxs = selectedCategory
-    ? gastos.filter(t => t.categoria === selectedCategory)
-        .sort((a, b) => b.fecha.localeCompare(a.fecha))
-        .map(t => `
-          <div class="cat-detail-item">
-            <div class="cat-detail-meta">
-              <span class="cat-detail-date">${new Date(t.fecha + "T12:00:00").toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}</span>
-              <span class="cat-detail-desc">${escapeHtml(t.descripcion)}</span>
-            </div>
-            <span class="cat-detail-amt">${fmt(t.monto)}</span>
-          </div>`).join("")
-    : "";
-
   el.innerHTML = `
-    <div class="donut">
-      <svg viewBox="0 0 42 42" class="donut-svg">
-        <circle cx="21" cy="21" r="15.91549431" fill="transparent" stroke="var(--bg-elev)" stroke-width="4.5"></circle>
-        ${segs}
-      </svg>
-      <div class="donut-center">
-        <span class="donut-label">Gastos</span>
-        <span class="donut-total">${fmt(total)}</span>
-      </div>
-    </div>
-    <div class="legend">${legend}</div>
-    ${selectedCategory ? `<div class="cat-detail"><div class="cat-detail-head">${escapeHtml(selectedCategory)} · ${detailTxs.split("cat-detail-item").length - 1} movimientos</div>${detailTxs}</div>` : ""}`;
+    <div class="category-list">
+      ${cats.map(cat => `
+        <button type="button" class="category-row" data-category="${escapeHtml(cat.name)}">
+          <span class="category-row-main">
+            <span class="category-row-dot" style="background:${PIE_COLORS[cats.indexOf(cat) % PIE_COLORS.length]}"></span>
+            <span class="category-row-name">${escapeHtml(cat.name)}</span>
+          </span>
+          <span class="category-row-amt">${fmt(cat.val)}</span>
+        </button>`).join("")}
+    </div>`;
 
-  el.querySelectorAll(".legend-row").forEach(btn => {
-    btn.addEventListener("click", () => {
-      selectedCategory = btn.dataset.category || null;
-      renderCategoryChart();
-    });
+  el.querySelectorAll(".category-row").forEach(btn => {
+    btn.addEventListener("click", () => openCategoryDetailModal(btn.dataset.category || ""));
   });
   renderIcons();
 }
