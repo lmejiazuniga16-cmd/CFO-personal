@@ -2274,29 +2274,24 @@ function renderCategoryChart() {
           <text x="54" y="67" text-anchor="middle" class="category-chart-total-sub">Total</text>
         </svg>
       </div>
-      <div class="category-chart-legend">
-        ${cats.map((cat, index) => `
-          <div class="category-chip">
-            <span class="category-dot" style="background:${PIE_COLORS[index % PIE_COLORS.length]}"></span>
-            <span class="category-chip-name">${escapeHtml(cat.name)}</span>
-            <span class="category-chip-amt">${fmt(cat.val)}</span>
-          </div>`).join("")}
-      </div>
     </div>
     <div class="category-list">
-      ${cats.map(cat => `
+      ${cats.map((cat, index) => `
         <button type="button" class="category-row" data-category="${escapeHtml(cat.name)}">
           <span class="category-row-main">
-            <span class="category-row-dot" style="background:${PIE_COLORS[cats.indexOf(cat) % PIE_COLORS.length]}"></span>
+            <span class="category-row-dot" style="background:${PIE_COLORS[index % PIE_COLORS.length]}"></span>
             <span class="category-row-name">${escapeHtml(cat.name)}</span>
           </span>
           <span class="category-row-amt">${fmt(cat.val)}</span>
         </button>`).join("")}
     </div>`;
 
-  el.querySelectorAll(".category-row").forEach(btn => {
-    btn.addEventListener("click", () => openCategoryDetailModal(btn.dataset.category || ""));
-  });
+  // Delegación de eventos para que todas las categorías sigan siendo clicables tras re-render.
+  el.onclick = (event) => {
+    const btn = event.target.closest(".category-row");
+    if (!btn) return;
+    openCategoryDetailModal(btn.dataset.category || "");
+  };
   renderIcons();
 }
 
