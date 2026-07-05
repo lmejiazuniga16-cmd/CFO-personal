@@ -2270,21 +2270,11 @@ function renderCategoryChart() {
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
-  const labels = [];
 
   const segments = cats.map((cat, index) => {
     const pct = total > 0 ? cat.val / total : 0;
     const length = circumference * pct;
     const color = PIE_COLORS[index % PIE_COLORS.length];
-    const midAngle = ((offset + length / 2) / circumference) * 360 - 90;
-    const rad = (midAngle * Math.PI) / 180;
-    const x = 54 + Math.cos(rad) * 34;
-    const y = 54 + Math.sin(rad) * 34;
-
-    if (pct >= 0.05) {
-      labels.push(`
-        <text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" class="category-chart-label">${escapeHtml(cat.name.length > 12 ? `${cat.name.slice(0, 12)}…` : cat.name)}</text>`);
-    }
 
     const segment = `
       <circle cx="54" cy="54" r="${radius}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
@@ -2300,7 +2290,6 @@ function renderCategoryChart() {
         <svg viewBox="0 0 108 108" class="category-chart-svg" aria-label="Distribución de gastos por categoría">
           <circle cx="54" cy="54" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="14"></circle>
           ${segments}
-          ${labels.join("")}
           <circle cx="54" cy="54" r="28" fill="var(--surface)"></circle>
           <text x="54" y="50" text-anchor="middle" class="category-chart-total-label">${fmt(total)}</text>
           <text x="54" y="67" text-anchor="middle" class="category-chart-total-sub">Total</text>
