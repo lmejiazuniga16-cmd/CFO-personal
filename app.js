@@ -2245,6 +2245,11 @@ window.closeCategoryDetailModal = () => {
   document.getElementById("category-detail-modal-bg").classList.remove("show");
 };
 
+function pctText(pct) {
+  const value = Number(pct || 0) * 100;
+  return `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
+}
+
 function renderCategoryChart() {
   const el = document.getElementById("cat-chart");
   const gastos = txInPeriod().filter(t => t.tipo === "expense");
@@ -2257,20 +2262,34 @@ function renderCategoryChart() {
 
   const byCat = {};
   gastos.forEach(t => { byCat[t.categoria] = (byCat[t.categoria] || 0) + t.monto; });
-  const cats = Object.entries(byCat)
+  const catsData = Object.entries(byCat)
     .map(([name, val]) => ({ name, val }))
     .sort((a, b) => b.val - a.val);
-  const total = cats.reduce((sum, cat) => sum + cat.val, 0);
+  const total = catsData.reduce((sum, cat) => sum + cat.val, 0);
+  const cats = catsData.map((cat) => ({ ...cat, pct: total > 0 ? cat.val / total : 0 }));
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
+  const labels = [];
 
   const segments = cats.map((cat, index) => {
     const pct = total > 0 ? cat.val / total : 0;
     const length = circumference * pct;
+    const color = PIE_COLORS[index % PIE_COLORS.length];
+    const midAngle = ((offset + length / 2) / circumference) * 360 - 90;
+    const rad = (midAngle * Math.PI) / 180;
+    const x = 54 + Math.cos(rad) * 34;
+    const y = 54 + Math.sin(rad) * 34;
+
+    if (pct >= 0.05) {
+      labels.push(`
+        <text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" class="category-chart-label">${escapeHtml(cat.name.length > 12 ? `${cat.name.slice(0, 12)}…` : cat.name)}</text>`);
+    }
+
     const segment = `
-      <circle cx="54" cy="54" r="${radius}" fill="none" stroke="${PIE_COLORS[index % PIE_COLORS.length]}" stroke-width="14" stroke-linecap="round"
-        stroke-dasharray="${length} ${circumference - length}" stroke-dashoffset="${-offset}" transform="rotate(-90 54 54)"></circle>`;
+      <circle cx="54" cy="54" r="${radius}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
+        stroke-dasharray="${length} ${circumference - length}" stroke-dashoffset="${-offset}" transform="rotate(-90 54 54)"
+        class="category-segment" data-category="${escapeHtml(cat.name)}" data-value="${cat.val}" data-percent="${pct}"></circle>`;
     offset += length;
     return segment;
   }).join("");
@@ -2281,10 +2300,12 @@ function renderCategoryChart() {
         <svg viewBox="0 0 108 108" class="category-chart-svg" aria-label="Distribución de gastos por categoría">
           <circle cx="54" cy="54" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="14"></circle>
           ${segments}
+          ${labels.join("")}
           <circle cx="54" cy="54" r="28" fill="var(--surface)"></circle>
           <text x="54" y="50" text-anchor="middle" class="category-chart-total-label">${fmt(total)}</text>
           <text x="54" y="67" text-anchor="middle" class="category-chart-total-sub">Total</text>
         </svg>
+        <div id="category-chart-tooltip" class="category-chart-tooltip hide"></div>
       </div>
     </div>
     <div class="category-list">
@@ -2294,15 +2315,46 @@ function renderCategoryChart() {
             <span class="category-row-dot" style="background:${PIE_COLORS[index % PIE_COLORS.length]}"></span>
             <span class="category-row-name">${escapeHtml(cat.name)}</span>
           </span>
-          <span class="category-row-amt">${fmt(cat.val)}</span>
+          <span class="category-row-stats">
+            <span class="category-row-pct">${pctText(cat.pct)}</span>
+            <span class="category-row-amt">${fmt(cat.val)}</span>
+          </span>
         </button>`).join("")}
     </div>`;
+
+  const tooltip = document.getElementById("category-chart-tooltip");
+  const showTooltip = (segment) => {
+    if (!segment || !tooltip) return;
+    const name = segment.dataset.category || "Categoría";
+    const value = Number(segment.dataset.value || 0);
+    const pct = Number(segment.dataset.percent || 0);
+    tooltip.innerHTML = `
+      <strong>${escapeHtml(name)}</strong>
+      <span class="category-chart-tooltip-value">${fmt(value)}</span>
+      <span class="category-chart-tooltip-pct">${pctText(pct)} del gasto total</span>`;
+    tooltip.classList.remove("hide");
+  };
+  const hideTooltip = () => tooltip?.classList.add("hide");
+
+  el.onmouseover = (event) => {
+    const segment = event.target.closest(".category-segment");
+    if (segment) showTooltip(segment);
+  };
+  el.onmouseout = (event) => {
+    if (!event.relatedTarget || !el.contains(event.relatedTarget)) hideTooltip();
+  };
 
   // Delegación de eventos para que todas las categorías sigan siendo clicables tras re-render.
   el.onclick = (event) => {
     const btn = event.target.closest(".category-row");
-    if (!btn) return;
-    openCategoryDetailModal(btn.dataset.category || "");
+    if (btn) {
+      openCategoryDetailModal(btn.dataset.category || "");
+      return;
+    }
+    const segment = event.target.closest(".category-segment");
+    if (segment) {
+      showTooltip(segment);
+    }
   };
   renderIcons();
 }
