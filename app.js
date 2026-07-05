@@ -195,15 +195,20 @@ const lastOfMonthISO = (d) => isoDate(new Date(d.getFullYear(), d.getMonth()+1, 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 let periodStart, periodEnd, periodMode;
+let selectedCategory = null;
 function defaultPeriod() {
-  const now = new Date();
-  periodStart = firstOfMonthISO(now);
-  periodEnd = lastOfMonthISO(now);
-  periodMode = "currentMonth";
+  periodStart = "";
+  periodEnd = "";
+  periodMode = "all";
 }
 defaultPeriod();
 
-const txInPeriod = () => allTransactions.filter(t => t.fecha >= periodStart && t.fecha <= periodEnd);
+const txInPeriod = () => {
+  if (periodMode === "all") return [...allTransactions];
+  if (periodMode === "custom") return allTransactions.filter(t => t.fecha >= periodStart && t.fecha <= periodEnd);
+  const monthKey = periodStart.slice(0, 7);
+  return allTransactions.filter(t => t.fecha.startsWith(monthKey));
+};
 
 function rangeLabel(a, b) {
   const opt = { day: "numeric", month: "short" };
@@ -213,6 +218,7 @@ function rangeLabel(a, b) {
   return `${sa} – ${sb}`;
 }
 function periodLabel() {
+  if (periodMode === "all") return "Todo";
   if (periodMode === "currentMonth") {
     const d = new Date(periodStart + "T12:00:00");
     return cap(MESES[d.getMonth()]) + " " + d.getFullYear();
@@ -221,6 +227,12 @@ function periodLabel() {
 }
 
 const fmt = (n) => "$" + Math.round(n).toLocaleString("es-CO");
+const escapeHtml = (s = "") => String(s)
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/\"/g, "&quot;")
+  .replace(/'/g, "&#39;");
 
 // ============================================================
 // SESIÓN PERSISTENTE — no volver a iniciar sesión cada vez
@@ -1781,7 +1793,15 @@ function renderHero() {
   const sub = document.getElementById("hero-sub");
   let ingresosTotal, gastosTotal, flujo;
 
-  if (periodMode === "currentMonth") {
+  if (periodMode === "all") {
+    const tx = txInPeriod();
+    ingresosTotal = tx.filter(t => t.tipo === "income").reduce((s, t) => s + t.monto, 0);
+    gastosTotal = tx.filter(t => t.tipo === "expense").reduce((s, t) => s + t.monto, 0);
+    flujo = ingresosTotal - gastosTotal;
+    eyebrow.textContent = "Balance general del historial";
+    sub.className = "hero-status ok";
+    sub.textContent = `${tx.length} ${tx.length === 1 ? "movimiento" : "movimientos"} registrados en todo el historial`;
+  } else if (periodMode === "currentMonth") {
     // Vista completa del mes: montos fijos + movimientos registrados
     const monthKey = periodStart.slice(0, 7);
     const txM = allTransactions.filter(t => t.fecha.startsWith(monthKey));
@@ -1862,7 +1882,7 @@ function updatePeriodUI() {
   document.getElementById("period-label").textContent = periodLabel();
   const custom = periodMode === "custom";
   document.getElementById("period-bar").classList.toggle("custom", custom);
-  document.getElementById("period-reset").classList.toggle("hide", !custom);
+  document.getElementById("period-reset").classList.toggle("hide", periodMode === "all");
 }
 
 function setPeriod(start, end, mode) {
@@ -1877,8 +1897,9 @@ window.openPeriod = () => {
   document.getElementById("period-from").value = periodStart;
   document.getElementById("period-to").value = periodEnd;
   document.getElementById("period-err").classList.remove("show");
-  document.querySelectorAll(".period-chips button").forEach((b, i) => {
-    b.classList.toggle("active", periodMode === "currentMonth" && i === 2); // "Este mes"
+  document.querySelectorAll(".period-chips button").forEach((b) => {
+    const mode = b.getAttribute("data-mode");
+    b.classList.toggle("active", periodMode === mode);
   });
   document.getElementById("period-modal-bg").classList.add("show");
   renderIcons();
@@ -1903,6 +1924,10 @@ window.setPeriodPreset = (name) => {
     s = firstOfMonthISO(now);
     e = lastOfMonthISO(now);
     mode = "currentMonth";
+  } else if (name === "all") {
+    s = "";
+    e = "";
+    mode = "all";
   } else if (name === "lastmonth") {
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     s = firstOfMonthISO(lm);
@@ -2000,27 +2025,43 @@ function txItemEl(t) {
 
 function renderChart() {
   const el = document.getElementById("chart-bars");
-  const months = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ key: d.toISOString().slice(0, 7), label: d.toLocaleDateString("es-CO", { month: "short" }) });
-  }
-  const totals = months.map(m => {
-    const sum = allTransactions.filter(t => t.tipo === "expense" && t.fecha.startsWith(m.key)).reduce((s, t) => s + t.monto, 0);
-    return GASTOS_FIJOS_MENSUALES + sum;
-  });
-  const max = Math.max(...totals, 1);
-  const budget = FLUJO_LIBRE_MENSUAL + GASTOS_FIJOS_MENSUALES; // 0 = sin presupuesto definido
-  el.innerHTML = "";
-  months.forEach((m, i) => {
-    const h = Math.max(6, (totals[i] / max) * 130);
-    const over = budget > 0 && totals[i] > budget;
-    const col = document.createElement("div");
-    col.className = "bar-col";
-    col.innerHTML = `<div class="bar ${over ? 'over' : ''}" style="height:${h}px" title="${fmt(totals[i])}"></div><div class="bar-month">${m.label}</div>`;
-    el.appendChild(col);
-  });
+  const tx = txInPeriod();
+  const ingresos = tx.filter(t => t.tipo === "income").reduce((s, t) => s + t.monto, 0);
+  const gastos = tx.filter(t => t.tipo === "expense").reduce((s, t) => s + t.monto, 0);
+  const balance = ingresos - gastos;
+  const pct = ingresos > 0 ? (gastos / ingresos) * 100 : null;
+  const pctText = ingresos > 0 ? `${pct >= 100 ? pct.toFixed(0) : pct.toFixed(1)}%` : "N/A";
+  const barWidth = ingresos > 0 ? Math.min(100, pct) : 0;
+  const label = periodMode === "all" ? "Todo el historial" : periodLabel();
+
+  el.innerHTML = `
+    <div class="period-summary">
+      <div class="period-summary-head">
+        <div>
+          <div class="period-summary-title">${escapeHtml(label)}</div>
+          <div class="period-summary-sub">Resumen financiero del periodo</div>
+        </div>
+        <div class="period-summary-badge">${periodMode === "all" ? "Historial completo" : "Periodo activo"}</div>
+      </div>
+      <div class="period-summary-grid">
+        <div class="summary-stat positive">
+          <span>Ingresos</span>
+          <strong>${fmt(ingresos)}</strong>
+        </div>
+        <div class="summary-stat negative">
+          <span>Gastos</span>
+          <strong>${fmt(gastos)}</strong>
+        </div>
+        <div class="summary-stat ${balance >= 0 ? 'positive' : 'negative'}">
+          <span>Balance</span>
+          <strong>${fmt(balance)}</strong>
+        </div>
+      </div>
+      <div class="summary-progress" aria-label="Porcentaje del ingreso gastado">
+        <div class="summary-progress-bar ${gastos > ingresos ? 'over' : ''}" style="width:${Math.max(4, Math.min(100, barWidth))}%"></div>
+      </div>
+      <div class="summary-foot">${ingresos > 0 ? `Has gastado el ${pctText} de tus ingresos.` : "Porcentaje: N/A"}</div>
+    </div>`;
 }
 
 // ============================================================
@@ -2039,7 +2080,6 @@ function renderCategoryChart() {
     return;
   }
 
-  // Sumar por categoría y ordenar de mayor a menor
   const byCat = {};
   gastos.forEach(t => { byCat[t.categoria] = (byCat[t.categoria] || 0) + t.monto; });
   const total = Object.values(byCat).reduce((a, b) => a + b, 0);
@@ -2047,7 +2087,10 @@ function renderCategoryChart() {
     .map(([name, val]) => ({ name, val, pct: (val / total) * 100 }))
     .sort((a, b) => b.val - a.val);
 
-  // Segmentos del donut (SVG rotado -90°: el primero arranca arriba)
+  if (selectedCategory && !cats.some(c => c.name === selectedCategory)) {
+    selectedCategory = null;
+  }
+
   let acc = 0;
   const segs = cats.map((c, i) => {
     c.color = PIE_COLORS[i % PIE_COLORS.length];
@@ -2058,12 +2101,25 @@ function renderCategoryChart() {
   }).join("");
 
   const legend = cats.map(c => `
-    <div class="legend-row">
+    <button type="button" class="legend-row ${selectedCategory === c.name ? "active" : ""}" data-category="${escapeHtml(c.name)}">
       <span class="legend-dot" style="background:${c.color}"></span>
-      <span class="legend-name">${c.name}</span>
+      <span class="legend-name">${escapeHtml(c.name)}</span>
       <span class="legend-pct">${Math.round(c.pct)}%</span>
       <span class="legend-amt">${fmt(c.val)}</span>
-    </div>`).join("");
+    </button>`).join("");
+
+  const detailTxs = selectedCategory
+    ? gastos.filter(t => t.categoria === selectedCategory)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha))
+        .map(t => `
+          <div class="cat-detail-item">
+            <div class="cat-detail-meta">
+              <span class="cat-detail-date">${new Date(t.fecha + "T12:00:00").toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}</span>
+              <span class="cat-detail-desc">${escapeHtml(t.descripcion)}</span>
+            </div>
+            <span class="cat-detail-amt">${fmt(t.monto)}</span>
+          </div>`).join("")
+    : "";
 
   el.innerHTML = `
     <div class="donut">
@@ -2076,7 +2132,15 @@ function renderCategoryChart() {
         <span class="donut-total">${fmt(total)}</span>
       </div>
     </div>
-    <div class="legend">${legend}</div>`;
+    <div class="legend">${legend}</div>
+    ${selectedCategory ? `<div class="cat-detail"><div class="cat-detail-head">${escapeHtml(selectedCategory)} · ${detailTxs.split("cat-detail-item").length - 1} movimientos</div>${detailTxs}</div>` : ""}`;
+
+  el.querySelectorAll(".legend-row").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedCategory = btn.dataset.category || null;
+      renderCategoryChart();
+    });
+  });
   renderIcons();
 }
 
