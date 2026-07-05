@@ -330,12 +330,37 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 .donut-label{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}
 .donut-total{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:16px;font-weight:700;color:var(--text);}
 .legend{width:100%;display:flex;flex-direction:column;}
-.legend-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line-soft);}
+.legend-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line-soft);width:100%;background:transparent;border:none;text-align:left;font:inherit;cursor:pointer;transition:background .15s,transform .15s;border-radius:10px;}
+.legend-row:hover{background:var(--surface-2);transform:translateX(2px);}
+.legend-row.active{background:var(--brand-tint);border-color:var(--brand);}
 .legend-row:last-child{border-bottom:none;}
 .legend-dot{width:10px;height:10px;border-radius:3px;flex:none;}
 .legend-name{flex:1;min-width:0;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .legend-pct{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;color:var(--text);min-width:42px;text-align:right;}
 .legend-amt{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--text-3);min-width:86px;text-align:right;}
+.cat-detail{width:100%;margin-top:12px;padding:12px;border-radius:12px;background:var(--bg-elev);border:1px solid var(--line-soft);display:flex;flex-direction:column;gap:8px;animation:fadeIn .2s ease;}
+.cat-detail-head{font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-3);}
+.cat-detail-item{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft);}
+.cat-detail-item:last-child{border-bottom:none;padding-bottom:0;}
+.cat-detail-meta{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.cat-detail-date{font-family:var(--f-mono);font-size:11px;color:var(--text-3);}
+.cat-detail-desc{font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cat-detail-amt{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;color:var(--text);flex:none;}
+.period-summary{display:flex;flex-direction:column;gap:12px;}
+.period-summary-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.period-summary-title{font-size:16px;font-weight:700;color:var(--text);}
+.period-summary-sub{font-size:12px;color:var(--text-3);margin-top:2px;}
+.period-summary-badge{font-size:11px;font-weight:700;color:var(--brand);background:var(--brand-tint);padding:6px 8px;border-radius:999px;white-space:nowrap;}
+.period-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.summary-stat{background:var(--bg-elev);border:1px solid var(--line-soft);border-radius:12px;padding:10px 11px;display:flex;flex-direction:column;gap:4px;}
+.summary-stat span{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;}
+.summary-stat strong{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;font-weight:700;color:var(--text);}
+.summary-stat.positive strong{color:var(--brand);} .summary-stat.negative strong{color:var(--red);} 
+.summary-progress{height:8px;border-radius:999px;background:var(--bg-elev);overflow:hidden;border:1px solid var(--line-soft);} 
+.summary-progress-bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--sky));transition:width .3s ease;} 
+.summary-progress-bar.over{background:linear-gradient(90deg,var(--red),#ff8f7a);} 
+.summary-foot{font-size:12px;color:var(--text-2);} 
+@keyframes fadeIn{from{opacity:0;transform:translateY(2px);}to{opacity:1;transform:translateY(0);}}
 
 /* ============================================================
    TX LIST
@@ -943,10 +968,11 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
     <div class="modal-handle"></div>
     <div class="modal-title">Elegir periodo</div>
     <div class="period-chips">
-      <button type="button" onclick="setPeriodPreset('today')">Hoy</button>
-      <button type="button" onclick="setPeriodPreset('week')">Esta semana</button>
-      <button type="button" onclick="setPeriodPreset('month')">Este mes</button>
-      <button type="button" onclick="setPeriodPreset('lastmonth')">Mes pasado</button>
+      <button type="button" data-mode="all" onclick="setPeriodPreset('all')">Todo</button>
+      <button type="button" data-mode="today" onclick="setPeriodPreset('today')">Hoy</button>
+      <button type="button" data-mode="week" onclick="setPeriodPreset('week')">Esta semana</button>
+      <button type="button" data-mode="currentMonth" onclick="setPeriodPreset('month')">Este mes</button>
+      <button type="button" data-mode="custom" onclick="setPeriodPreset('lastmonth')">Mes pasado</button>
     </div>
     <div class="period-range">
       <div class="field"><div class="field-label">Desde</div><input type="date" id="period-from"></div>
