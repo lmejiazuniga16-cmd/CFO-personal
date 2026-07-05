@@ -158,6 +158,7 @@ const ICON_CHOICES = [
   "piggy-bank", "users", "baby", "graduation-book", "book-open", "clapperboard", "gamepad-2",
   "dumbbell", "plane", "gift", "briefcase", "video", "coffee", "shirt", "wrench", "paw-print", "package"
 ];
+const PIE_COLORS = ["var(--brand)", "var(--sky)", "var(--gold)", "var(--red)", "#7F8CFF", "#FF8A5B", "#A3E635", "#F472B6"];
 
 // Helpers de render con Lucide (sin build / sin React: usamos el paquete vanilla)
 const iconHtml = (name) => `<i data-lucide="${name || DEFAULT_ICON}"></i>`;
@@ -2127,31 +2128,40 @@ function txItemEl(t) {
 
 function renderChart() {
   const el = document.getElementById("chart-bars");
-  const months = txInPeriod()
-    .filter(t => t.tipo === "income" || t.tipo === "expense")
-    .reduce((acc, t) => {
-      const key = t.fecha.slice(0, 7);
-      if (!acc[key]) {
-        acc[key] = { key, label: new Date(t.fecha + "T12:00:00"), income: 0, expense: 0 };
-      }
-      if (t.tipo === "income") acc[key].income += t.monto;
-      else acc[key].expense += t.monto;
-      return acc;
-    }, {});
+  const tx = txInPeriod().filter(t => t.tipo === "income" || t.tipo === "expense");
+  const rows = [];
+  const startDate = tx.length > 0
+    ? new Date(tx[0].fecha + "T12:00:00")
+    : (periodMode === "custom" && periodStart && periodEnd ? new Date(periodStart + "T12:00:00") : new Date());
+  const endDate = tx.length > 0
+    ? new Date(tx[tx.length - 1].fecha + "T12:00:00")
+    : (periodMode === "custom" && periodStart && periodEnd ? new Date(periodEnd + "T12:00:00") : new Date());
 
-  const rows = Object.values(months)
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .filter(item => item.income > 0);
+  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  while (cursor <= endDate) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+    rows.push({ key, label: new Date(cursor), income: 0, expense: 0 });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  tx.forEach(t => {
+    const key = t.fecha.slice(0, 7);
+    const item = rows.find(r => r.key === key);
+    if (item) {
+      if (t.tipo === "income") item.income += t.monto;
+      else item.expense += t.monto;
+    }
+  });
 
   if (rows.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="empty-ic">${iconHtml("chart-column")}</div><div class="empty-title">Sin datos suficientes</div><div class="empty-sub">No hay ingresos registrados para construir la evolución mensual.</div></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-ic">${iconHtml("chart-column")}</div><div class="empty-title">Sin datos suficientes</div><div class="empty-sub">No hay ingresos ni gastos para construir la evolución mensual.</div></div>`;
     renderIcons();
     return;
   }
 
-  const maxPct = Math.max(...rows.map(item => (item.expense / item.income) * 100), 100);
+  const maxIncome = Math.max(...rows.map(item => item.income), 1);
   const bars = rows.map(item => {
-    const pct = (item.expense / item.income) * 100;
+    const pct = item.income > 0 ? (item.expense / item.income) * 100 : 0;
     let state = "Dentro del presupuesto";
     let cls = "good";
     if (pct > 90) {
@@ -2162,11 +2172,19 @@ function renderChart() {
       cls = "warn";
     }
     const label = item.label.toLocaleDateString("es-CO", { month: "short", year: "numeric" });
-    const tooltip = `Mes y año: ${label}\nPorcentaje gastado: ${pct.toFixed(1)}%\nEstado: ${state}`;
+    const tooltip = `Mes: ${label}\nIngresos: ${fmt(item.income)}\nGastos: ${fmt(item.expense)}\nPorcentaje gastado: ${pct.toFixed(1)}%\nEstado: ${state}`;
+    const incomeHeight = item.income > 0 ? Math.max(8, (item.income / maxIncome) * 100) : 0;
+    const expenseHeight = item.income > 0 ? Math.min(item.expense, item.income) / maxIncome * 100 : 0;
+    const overflowHeight = item.income > 0 && item.expense > item.income ? (item.expense - item.income) / maxIncome * 100 : 0;
+    const empty = item.income === 0 && item.expense === 0;
     return `
       <div class="evolution-bar-col">
-        <div class="evolution-bar-wrap">
-          <div class="evolution-bar ${cls}" style="height:${Math.max(8, (pct / maxPct) * 100)}%" title="${tooltip}"></div>
+        <div class="evolution-bar-wrap" title="${tooltip}">
+          <div class="evolution-bar-stack ${empty ? "empty" : ""}">
+            <div class="evolution-bar-base" style="height:${empty ? 8 : incomeHeight}%;"></div>
+            ${item.income > 0 && expenseHeight > 0 ? `<div class="evolution-bar-expense ${cls}" style="height:${empty ? 0 : expenseHeight}%;"></div>` : ""}
+            ${overflowHeight > 0 ? `<div class="evolution-bar-overflow" style="height:${overflowHeight}%;"></div>` : ""}
+          </div>
         </div>
         <div class="evolution-bar-label">${item.label.toLocaleDateString("es-CO", { month: "short" })}</div>
       </div>`;
@@ -2230,8 +2248,41 @@ function renderCategoryChart() {
   const cats = Object.entries(byCat)
     .map(([name, val]) => ({ name, val }))
     .sort((a, b) => b.val - a.val);
+  const total = cats.reduce((sum, cat) => sum + cat.val, 0);
+  const radius = 46;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  const segments = cats.map((cat, index) => {
+    const pct = total > 0 ? cat.val / total : 0;
+    const length = circumference * pct;
+    const segment = `
+      <circle cx="54" cy="54" r="${radius}" fill="none" stroke="${PIE_COLORS[index % PIE_COLORS.length]}" stroke-width="14" stroke-linecap="round"
+        stroke-dasharray="${length} ${circumference - length}" stroke-dashoffset="${-offset}" transform="rotate(-90 54 54)"></circle>`;
+    offset += length;
+    return segment;
+  }).join("");
 
   el.innerHTML = `
+    <div class="category-chart-card">
+      <div class="category-chart-visual">
+        <svg viewBox="0 0 108 108" class="category-chart-svg" aria-label="Distribución de gastos por categoría">
+          <circle cx="54" cy="54" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="14"></circle>
+          ${segments}
+          <circle cx="54" cy="54" r="28" fill="var(--surface)"></circle>
+          <text x="54" y="50" text-anchor="middle" class="category-chart-total-label">${fmt(total)}</text>
+          <text x="54" y="67" text-anchor="middle" class="category-chart-total-sub">Total</text>
+        </svg>
+      </div>
+      <div class="category-chart-legend">
+        ${cats.map((cat, index) => `
+          <div class="category-chip">
+            <span class="category-dot" style="background:${PIE_COLORS[index % PIE_COLORS.length]}"></span>
+            <span class="category-chip-name">${escapeHtml(cat.name)}</span>
+            <span class="category-chip-amt">${fmt(cat.val)}</span>
+          </div>`).join("")}
+      </div>
+    </div>
     <div class="category-list">
       ${cats.map(cat => `
         <button type="button" class="category-row" data-category="${escapeHtml(cat.name)}">
