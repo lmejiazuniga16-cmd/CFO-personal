@@ -158,7 +158,7 @@ const ICON_CHOICES = [
   "piggy-bank", "users", "baby", "graduation-book", "book-open", "clapperboard", "gamepad-2",
   "dumbbell", "plane", "gift", "briefcase", "video", "coffee", "shirt", "wrench", "paw-print", "package"
 ];
-const PIE_COLORS = ["var(--brand)", "var(--sky)", "var(--gold)", "var(--red)", "#7F8CFF", "#FF8A5B", "#A3E635", "#F472B6"];
+const PIE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)", "var(--chart-7)", "var(--chart-8)"];
 
 // Helpers de render con Lucide (sin build / sin React: usamos el paquete vanilla)
 const iconHtml = (name) => `<i data-lucide="${name || DEFAULT_ICON}"></i>`;
