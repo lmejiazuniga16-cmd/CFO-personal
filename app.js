@@ -2128,15 +2128,35 @@ function txItemEl(t) {
 
 function renderChart() {
   const el = document.getElementById("chart-bars");
-  const tx = txInPeriod().filter(t => t.tipo === "income" || t.tipo === "expense");
-  const rows = [];
-  const startDate = tx.length > 0
-    ? new Date(tx[0].fecha + "T12:00:00")
-    : (periodMode === "custom" && periodStart && periodEnd ? new Date(periodStart + "T12:00:00") : new Date());
-  const endDate = tx.length > 0
-    ? new Date(tx[tx.length - 1].fecha + "T12:00:00")
-    : (periodMode === "custom" && periodStart && periodEnd ? new Date(periodEnd + "T12:00:00") : new Date());
+  const tx = txInPeriod().filter(Boolean);
+  const normalized = tx
+    .map((t) => {
+      const rawType = t.tipo || t.type || t.kind || t.transactionType || "";
+      const normalizedType = rawType === "income" || rawType === "ingreso" || rawType === "in" ? "income" : rawType === "expense" || rawType === "gasto" || rawType === "out" ? "expense" : "";
+      const rawAmount = Number(t.monto ?? t.amount ?? t.valor ?? 0);
+      const rawDate = t.fecha || t.date || t.createdAt || "";
+      const dateText = typeof rawDate === "string" ? rawDate : rawDate?.toDate ? rawDate.toDate().toISOString().slice(0, 10) : "";
+      const monthKey = dateText ? dateText.slice(0, 7) : "";
+      return {
+        ...t,
+        tipo: normalizedType || (rawAmount >= 0 ? "income" : "expense"),
+        monto: Number.isFinite(rawAmount) ? rawAmount : 0,
+        fecha: dateText,
+        monthKey
+      };
+    })
+    .filter((t) => t.fecha && (t.tipo === "income" || t.tipo === "expense"));
 
+  const rows = [];
+  const sorted = normalized.slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (sorted.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-ic">${iconHtml("chart-column")}</div><div class="empty-title">Sin datos suficientes</div><div class="empty-sub">No hay ingresos ni gastos para construir la evolución mensual.</div></div>`;
+    renderIcons();
+    return;
+  }
+
+  const startDate = new Date(sorted[0].fecha + "T12:00:00");
+  const endDate = new Date(sorted[sorted.length - 1].fecha + "T12:00:00");
   const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
   while (cursor <= endDate) {
     const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
@@ -2144,23 +2164,15 @@ function renderChart() {
     cursor.setMonth(cursor.getMonth() + 1);
   }
 
-  tx.forEach(t => {
-    const key = t.fecha.slice(0, 7);
-    const item = rows.find(r => r.key === key);
-    if (item) {
-      if (t.tipo === "income") item.income += t.monto;
-      else item.expense += t.monto;
-    }
+  sorted.forEach((t) => {
+    const item = rows.find((r) => r.key === t.monthKey);
+    if (!item) return;
+    if (t.tipo === "income") item.income += t.monto;
+    else item.expense += t.monto;
   });
 
-  if (rows.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="empty-ic">${iconHtml("chart-column")}</div><div class="empty-title">Sin datos suficientes</div><div class="empty-sub">No hay ingresos ni gastos para construir la evolución mensual.</div></div>`;
-    renderIcons();
-    return;
-  }
-
-  const maxIncome = Math.max(...rows.map(item => item.income), 1);
-  const bars = rows.map(item => {
+  const maxBar = Math.max(...rows.map((item) => Math.max(item.income, item.expense, 1)), 1);
+  const bars = rows.map((item) => {
     const pct = item.income > 0 ? (item.expense / item.income) * 100 : 0;
     let state = "Dentro del presupuesto";
     let cls = "good";
@@ -2173,16 +2185,16 @@ function renderChart() {
     }
     const label = item.label.toLocaleDateString("es-CO", { month: "short", year: "numeric" });
     const tooltip = `Mes: ${label}\nIngresos: ${fmt(item.income)}\nGastos: ${fmt(item.expense)}\nPorcentaje gastado: ${pct.toFixed(1)}%\nEstado: ${state}`;
-    const incomeHeight = item.income > 0 ? Math.max(8, (item.income / maxIncome) * 100) : 0;
-    const expenseHeight = item.income > 0 ? Math.min(item.expense, item.income) / maxIncome * 100 : 0;
-    const overflowHeight = item.income > 0 && item.expense > item.income ? (item.expense - item.income) / maxIncome * 100 : 0;
+    const incomeHeight = item.income > 0 ? Math.max(8, (item.income / maxBar) * 100) : 0;
+    const expenseHeight = item.expense > 0 ? Math.min(item.expense, item.income) / maxBar * 100 : 0;
+    const overflowHeight = item.expense > item.income ? (item.expense - item.income) / maxBar * 100 : 0;
     const empty = item.income === 0 && item.expense === 0;
     return `
       <div class="evolution-bar-col">
         <div class="evolution-bar-wrap" title="${tooltip}">
           <div class="evolution-bar-stack ${empty ? "empty" : ""}">
             <div class="evolution-bar-base" style="height:${empty ? 8 : incomeHeight}%;"></div>
-            ${item.income > 0 && expenseHeight > 0 ? `<div class="evolution-bar-expense ${cls}" style="height:${empty ? 0 : expenseHeight}%;"></div>` : ""}
+            ${item.expense > 0 ? `<div class="evolution-bar-expense ${cls}" style="height:${empty ? 0 : expenseHeight}%;"></div>` : ""}
             ${overflowHeight > 0 ? `<div class="evolution-bar-overflow" style="height:${overflowHeight}%;"></div>` : ""}
           </div>
         </div>
