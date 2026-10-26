@@ -278,9 +278,39 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 .section{margin-top:30px;}
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;}
 .section-title{font-family:var(--f-display);font-size:16px;font-weight:700;color:var(--text);}
+.section-header-copy{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.section-subtitle{font-size:12px;color:var(--text-3);font-weight:500;line-height:1.3;}
 .section-link{font-size:12.5px;font-weight:600;color:var(--text-2);display:inline-flex;align-items:center;gap:3px;padding:4px 6px;border-radius:8px;transition:color .2s var(--ease),background-color .2s var(--ease);}
 .section-link svg.lucide{width:14px;height:14px;}
-.section-link:hover{color:var(--brand);background-color:var(--brand-tint);}
+.section-link:hover{color:var(--brand);background-color:var(--brand-tint);} 
+
+.history-section{margin-top:30px;}
+.history-header{align-items:flex-start;gap:16px;}
+.history-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto;}
+
+.history-list-header{display:flex;align-items:center;gap:8px;padding:12px 0 10px;margin-top:10px;color:var(--text-2);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;}
+.history-list-header::before{content:"";display:block;flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01));}
+.history-list-header::after{content:"";display:block;flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.01),rgba(255,255,255,0.08));}
+
+.tx-filter-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;box-shadow:var(--shadow-soft);transition:background .2s var(--ease),border-color .2s var(--ease),transform .2s var(--ease),box-shadow .2s var(--ease);min-height:38px;}
+.tx-filter-btn:hover{background:var(--surface-2);border-color:var(--secondary-color);transform:translateY(-1px);box-shadow:var(--shadow-soft);} 
+.tx-filter-btn svg.lucide{width:15px;height:15px;color:var(--brand);} 
+.tx-filter-btn.export-btn{background:var(--surface-2);border-color:var(--line);padding-inline:15px;}
+.tx-filter-btn.export-btn svg.lucide{color:var(--brand);}
+.tx-filter-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 14px;padding:8px 0 0;}
+.tx-filter-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line-soft);font-size:11.5px;color:var(--text-2);} 
+.tx-filter-clear{background:transparent;border:none;color:var(--text-3);font-size:12px;font-weight:600;cursor:pointer;padding:4px 8px;border-radius:8px;transition:color .2s,background-color .2s;} 
+.tx-filter-clear:hover{color:var(--text);background-color:var(--surface-2);} 
+
+@media (max-width: 480px) {
+  .history-header{flex-direction:column;align-items:stretch;}
+  .history-actions{justify-content:stretch;width:100%;margin-left:0;}
+  .history-actions > *{flex:1 1 100%;}
+  .tx-filter-btn{width:100%;}
+  .tx-filter-status{flex-direction:column;align-items:flex-start;}
+  .tx-filter-clear{align-self:flex-end;}
+  .history-list-header{font-size:10px;letter-spacing:0.06em;}
+}
 
 .card{
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
@@ -411,13 +441,6 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(2px);}to{opacity:1;transform:translateY(0);}}
 @keyframes modalPop{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:translateY(0) scale(1);}}
 
-.tx-filter-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;box-shadow:var(--shadow-soft);transition:background .2s var(--ease),border-color .2s var(--ease),transform .2s var(--ease),box-shadow .2s var(--ease);}
-.tx-filter-btn:hover{background:var(--surface-2);border-color:var(--secondary-color);transform:translateY(-1px);box-shadow:var(--shadow-soft);} 
-.tx-filter-btn svg.lucide{width:15px;height:15px;color:var(--brand);} 
-.tx-filter-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.tx-filter-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line-soft);font-size:11.5px;color:var(--text-2);} 
-.tx-filter-clear{background:transparent;border:none;color:var(--text-3);font-size:12px;font-weight:600;cursor:pointer;padding:4px 8px;border-radius:8px;transition:color .2s,background-color .2s;} 
-.tx-filter-clear:hover{color:var(--text);background-color:var(--surface-2);} 
 .movement-filter-modal .modal{max-width:min(560px, calc(100% - 24px));border-radius:var(--radius-lg);border:1px solid var(--line);padding:22px 20px 24px;background:var(--surface);} 
 .movement-filter-group{display:flex;flex-direction:column;gap:10px;margin:12px 0 14px;} 
 .movement-filter-option{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-size:13.5px;cursor:pointer;transition:background .2s,border-color .2s;} 
@@ -1002,15 +1025,18 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
         <div class="section-title" style="margin-bottom:13px;">¿En qué se va la plata?</div>
         <div class="card" id="cat-chart"></div>
       </div>
-      <div class="section">
-        <div class="section-head" style="margin-bottom:10px;">
-          <div class="section-title">Todos los movimientos</div>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <div class="section history-section">
+        <div class="section-head history-header" style="margin-bottom:10px;">
+          <div class="section-header-copy">
+            <div class="section-title">Todos los movimientos</div>
+            <div class="section-subtitle">Consulta y descarga tus registros</div>
+          </div>
+          <div class="history-actions">
             <button class="tx-filter-btn" type="button" onclick="openMovementFilters()">
               <i data-lucide="sliders-horizontal"></i>
               <span>Filtrar movimientos</span>
             </button>
-            <button class="tx-filter-btn" id="export-csv-btn" type="button" onclick="openCsvExportModal()">
+            <button class="tx-filter-btn export-btn" id="export-csv-btn" type="button" onclick="openCsvExportModal()">
               <i data-lucide="download"></i>
               <span>Exportar a CSV</span>
             </button>
@@ -1020,6 +1046,7 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
           <span class="tx-filter-pill">Activo: <strong id="tx-filter-active">Últimos 10</strong></span>
           <button class="tx-filter-clear" type="button" onclick="clearMovementFilters()">Limpiar filtros</button>
         </div>
+        <div class="history-list-header">Movimientos registrados</div>
         <div class="card" id="tx-full"></div>
       </div>
     </div>
