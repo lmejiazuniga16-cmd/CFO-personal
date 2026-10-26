@@ -201,12 +201,304 @@ let movementFilter = "latest10";
 let movementMonths = [];
 let movementStartDate = "";
 let movementEndDate = "";
+let csvExportMode = "all";
+let csvExportMonth = "";
+let csvExportMonths = [];
+let csvExportStartDate = "";
+let csvExportEndDate = "";
 function defaultPeriod() {
   periodStart = "";
   periodEnd = "";
   periodMode = "all";
 }
 defaultPeriod();
+
+function getExportableTransactions() {
+  const base = [...allTransactions]
+    .map((tx) => ({
+      ...tx,
+      fecha: tx.fecha || tx.date || "",
+      tipo: tx.tipo || tx.type || "",
+      categoria: tx.categoria || tx.category || "",
+      descripcion: tx.descripcion || tx.description || "",
+      monto: Number(tx.monto ?? tx.amount ?? tx.valor ?? 0),
+      debtId: tx.debtId || tx.debt_id || "",
+      creadoEn: tx.creadoEn || tx.createdAt || ""
+    }))
+    .filter((tx) => tx.fecha)
+    .sort((a, b) => {
+      const dateCompare = (a.fecha || "").localeCompare(b.fecha || "");
+      if (dateCompare !== 0) return dateCompare;
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
+
+  if (csvExportMode === "all") return base;
+  if (csvExportMode === "month") {
+    if (!csvExportMonth) return [];
+    return base.filter((tx) => tx.fecha.startsWith(csvExportMonth));
+  }
+  if (csvExportMode === "months") {
+    if (csvExportMonths.length === 0) return [];
+    const selected = new Set(csvExportMonths);
+    return base.filter((tx) => selected.has(tx.fecha.slice(0, 7)));
+  }
+  if (csvExportMode === "range") {
+    if (!csvExportStartDate || !csvExportEndDate) return [];
+    return base.filter((tx) => tx.fecha >= csvExportStartDate && tx.fecha <= csvExportEndDate);
+  }
+  return base;
+}
+
+function csvEscape(value) {
+  const raw = value === null || value === undefined ? "" : String(value);
+  const clean = raw.replace(/\r?\n/g, " ").replace(/\r/g, " ");
+  return `"${clean.replace(/"/g, '""')}"`;
+}
+
+function buildCsvFromArray(rows, headers) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return [headers.join(",")].join("\n");
+  }
+
+  const normalizedHeaders = [...headers];
+  const lines = [normalizedHeaders.join(",")];
+
+  rows.forEach((row) => {
+    const line = normalizedHeaders.map((header) => {
+      const cell = row[header];
+      if (cell === null || cell === undefined) return "";
+      if (typeof cell === "number") return String(cell);
+      if (typeof cell === "string") return cell;
+      if (cell && typeof cell.toDate === "function") {
+        const d = cell.toDate();
+        return d.toISOString().slice(0, 10);
+      }
+      if (cell instanceof Date) {
+        return cell.toISOString().slice(0, 10);
+      }
+      return String(cell);
+    }).map(csvEscape).join(",");
+    lines.push(line);
+  });
+
+  return lines.join("\n");
+}
+
+function triggerCsvDownload(filename, content) {
+  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), content], {
+    type: "text/csv;charset=utf-8;"
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function downloadCsvBundle(files) {
+  files.forEach((file) => triggerCsvDownload(file.name, file.content));
+}
+
+function formatCsvFilename(label) {
+  const today = new Date().toISOString().slice(0, 10);
+  return `CFO_Personal_${label}_${today}.csv`;
+}
+
+function buildTransactionsCsv(rows) {
+  const headers = ["id", "fecha", "tipo", "categoria", "descripcion", "monto", "debtId", "creadoEn"];
+  return buildCsvFromArray(rows.map((tx) => ({
+    id: tx.id || "",
+    fecha: tx.fecha || "",
+    tipo: tx.tipo || "",
+    categoria: tx.categoria || "",
+    descripcion: tx.descripcion || "",
+    monto: Number(tx.monto ?? 0),
+    debtId: tx.debtId || "",
+    creadoEn: tx.creadoEn && typeof tx.creadoEn.toDate === "function" ? tx.creadoEn.toDate().toISOString().slice(0, 10) : (tx.creadoEn || "")
+  })), headers);
+}
+
+function buildDebtCsv(rows) {
+  if (!rows || rows.length === 0) return "";
+  const headers = [
+    "id", "nombre", "saldo", "saldoOriginal", "cuotaMensual", "tasaEA", "cuotasRestantes", "fechaFin", "pago",
+    "abonoParcial", "automaticDebit", "debitPaymentsPerMonth", "debitStartDate", "lastAutoDebitRun", "color", "debtType"
+  ];
+  return buildCsvFromArray(rows.map((debt) => ({
+    id: debt.id || "",
+    nombre: debt.nombre || "",
+    saldo: Number(debt.saldo ?? 0),
+    saldoOriginal: Number(debt.saldoOriginal ?? 0),
+    cuotaMensual: Number(debt.cuotaMensual ?? 0),
+    tasaEA: Number(debt.tasaEA ?? 0),
+    cuotasRestantes: Number(debt.cuotasRestantes ?? 0),
+    fechaFin: debt.fechaFin || "",
+    pago: debt.pago || "",
+    abonoParcial: Boolean(debt.abonoParcial),
+    automaticDebit: Boolean(debt.automaticDebit),
+    debitPaymentsPerMonth: Number(debt.debitPaymentsPerMonth ?? 0),
+    debitStartDate: debt.debitStartDate || "",
+    lastAutoDebitRun: debt.lastAutoDebitRun || "",
+    color: debt.color || "",
+    debtType: debt.debtType || ""
+  })), headers);
+}
+
+function buildSavingsCsv(rows) {
+  if (!rows || rows.length === 0) return "";
+  const headers = ["id", "nombre", "descripcion", "valor", "ultimaActualizacion"];
+  return buildCsvFromArray(rows.map((item) => ({
+    id: item.id || "",
+    nombre: item.nombre || "",
+    descripcion: item.descripcion || "",
+    valor: Number(item.valor ?? 0),
+    ultimaActualizacion: item.ultimaActualizacion || ""
+  })), headers);
+}
+
+function setCsvExportMode(mode) {
+  csvExportMode = mode;
+  const monthWrap = document.getElementById("csv-export-month-wrap");
+  const monthsWrap = document.getElementById("csv-export-months-wrap");
+  const rangeWrap = document.getElementById("csv-export-range-wrap");
+  monthWrap?.classList.toggle("hide", mode !== "month");
+  monthsWrap?.classList.toggle("hide", mode !== "months");
+  rangeWrap?.classList.toggle("hide", mode !== "range");
+}
+
+function populateCsvExportFilters() {
+  const monthInput = document.getElementById("csv-export-month");
+  if (monthInput) {
+    monthInput.value = csvExportMonth || "";
+  }
+
+  const allMonths = [...new Set((allTransactions || [])
+    .map((tx) => (tx.fecha || tx.date || "").slice(0, 7))
+    .filter(Boolean))].sort();
+  const monthList = document.getElementById("csv-export-months");
+  if (monthList) {
+    const selectedSet = new Set(csvExportMonths);
+    monthList.innerHTML = (allMonths.length ? allMonths : [new Date().toISOString().slice(0, 7)]).map((monthKey) => {
+      const label = new Date(`${monthKey}-01T12:00:00`).toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+      return `
+        <label class="movement-month-option">
+          <input type="checkbox" value="${monthKey}" ${selectedSet.has(monthKey) ? "checked" : ""}> ${label}
+        </label>`;
+    }).join("");
+  }
+
+  const startDate = document.getElementById("csv-export-start");
+  const endDate = document.getElementById("csv-export-end");
+  if (startDate) startDate.value = csvExportStartDate || "";
+  if (endDate) endDate.value = csvExportEndDate || "";
+}
+
+window.openCsvExportModal = () => {
+  const modal = document.getElementById("csv-export-modal-bg");
+  if (!modal) return;
+
+  const modeInput = document.querySelector(`input[name="csv-export-mode"][value="${csvExportMode}"]`);
+  if (modeInput) modeInput.checked = true;
+  setCsvExportMode(csvExportMode);
+  populateCsvExportFilters();
+  modal.classList.add("show");
+};
+
+window.closeCsvExportModal = () => {
+  const modal = document.getElementById("csv-export-modal-bg");
+  if (modal) modal.classList.remove("show");
+};
+
+window.setCsvExportModeFromUi = (mode) => {
+  csvExportMode = mode;
+  setCsvExportMode(mode);
+};
+
+window.applyCsvExportSettings = () => {
+  const selectedMode = document.querySelector("input[name='csv-export-mode']:checked")?.value || "all";
+  csvExportMode = selectedMode;
+  csvExportMonth = document.getElementById("csv-export-month")?.value || "";
+  csvExportMonths = Array.from(document.querySelectorAll("#csv-export-months input:checked")).map((el) => el.value);
+  csvExportStartDate = document.getElementById("csv-export-start")?.value || "";
+  csvExportEndDate = document.getElementById("csv-export-end")?.value || "";
+
+  if (csvExportMode === "month" && !csvExportMonth) {
+    showToast("Selecciona un mes para exportar", true);
+    return;
+  }
+  if (csvExportMode === "months" && csvExportMonths.length === 0) {
+    showToast("Selecciona al menos un mes", true);
+    return;
+  }
+  if (csvExportMode === "range") {
+    if (!csvExportStartDate || !csvExportEndDate) {
+      showToast("Define una fecha inicial y final", true);
+      return;
+    }
+    if (csvExportStartDate > csvExportEndDate) {
+      showToast("La fecha inicial no puede ser posterior a la final", true);
+      return;
+    }
+  }
+
+  setCsvExportMode(selectedMode);
+  closeCsvExportModal();
+  window.confirmCsvExport();
+};
+
+window.confirmCsvExport = async () => {
+  const exportButton = document.getElementById("export-csv-btn");
+  if (!currentUser) {
+    showToast("Inicia sesión para exportar tus datos", true);
+    return;
+  }
+
+  const rows = getExportableTransactions();
+  if (!rows.length) {
+    showToast("No hay movimientos para exportar en este filtro", true);
+    return;
+  }
+
+  if (exportButton) {
+    exportButton.disabled = true;
+    exportButton.innerHTML = `<i data-lucide="loader-circle"></i><span>Exportando…</span>`;
+    renderIcons();
+  }
+
+  try {
+    const txCsv = buildTransactionsCsv(rows);
+    const files = [{ name: formatCsvFilename("Historial"), content: txCsv }];
+
+    if (debtsState && debtsState.length) {
+      const debtCsv = buildDebtCsv(debtsState);
+      if (debtCsv) {
+        files.push({ name: formatCsvFilename("Deudas"), content: debtCsv });
+      }
+    }
+
+    if (ahorrosState && ahorrosState.length) {
+      const savingsCsv = buildSavingsCsv(ahorrosState);
+      if (savingsCsv) {
+        files.push({ name: formatCsvFilename("Ahorros"), content: savingsCsv });
+      }
+    }
+
+    downloadCsvBundle(files);
+    showToast(`Descarga lista: ${files.length} archivo${files.length > 1 ? "s" : ""}`);
+  } catch (error) {
+    console.error("CSV export error:", error);
+    showToast("No se pudo exportar el CSV. Intenta de nuevo.", true);
+  } finally {
+    if (exportButton) {
+      exportButton.disabled = false;
+      exportButton.innerHTML = '<i data-lucide="download"></i><span>Exportar a CSV</span>';
+      renderIcons();
+    }
+  }
+};
 
 const txInPeriod = () => {
   if (periodMode === "all") return [...allTransactions];
