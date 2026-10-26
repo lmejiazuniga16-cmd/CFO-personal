@@ -1005,10 +1005,16 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
       <div class="section">
         <div class="section-head" style="margin-bottom:10px;">
           <div class="section-title">Todos los movimientos</div>
-          <button class="tx-filter-btn" type="button" onclick="openMovementFilters()">
-            <i data-lucide="sliders-horizontal"></i>
-            <span>Filtrar movimientos</span>
-          </button>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <button class="tx-filter-btn" type="button" onclick="openMovementFilters()">
+              <i data-lucide="sliders-horizontal"></i>
+              <span>Filtrar movimientos</span>
+            </button>
+            <button class="tx-filter-btn" id="export-csv-btn" type="button" onclick="openCsvExportModal()">
+              <i data-lucide="download"></i>
+              <span>Exportar a CSV</span>
+            </button>
+          </div>
         </div>
         <div class="tx-filter-status">
           <span class="tx-filter-pill">Activo: <strong id="tx-filter-active">Últimos 10</strong></span>
@@ -1088,6 +1094,35 @@ main > div:not(.hide){animation:viewIn .34s var(--ease) both;}
     <div class="movement-filter-actions">
       <button type="button" class="modal-submit secondary" onclick="clearMovementFilters()"><i data-lucide="rotate-ccw"></i>Limpiar</button>
       <button type="button" class="modal-submit" onclick="applyMovementFilters()"><i data-lucide="check"></i>Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: exportación CSV -->
+<div class="modal-bg modal-center-bg" id="csv-export-modal-bg" onclick="if(event.target.id==='csv-export-modal-bg') closeCsvExportModal()">
+  <div class="modal modal-center movement-filter-modal">
+    <button type="button" class="category-detail-close" onclick="closeCsvExportModal()" aria-label="Cerrar exportación"><i data-lucide="x"></i></button>
+    <div class="modal-handle"></div>
+    <div class="modal-title">Exportar a CSV</div>
+    <div class="movement-filter-group">
+      <label class="movement-filter-option"><input type="radio" name="csv-export-mode" value="all" checked onchange="setCsvExportModeFromUi('all')"> Todo el historial</label>
+      <label class="movement-filter-option"><input type="radio" name="csv-export-mode" value="month" onchange="setCsvExportModeFromUi('month')"> Un mes específico</label>
+      <label class="movement-filter-option"><input type="radio" name="csv-export-mode" value="months" onchange="setCsvExportModeFromUi('months')"> Varios meses</label>
+      <label class="movement-filter-option"><input type="radio" name="csv-export-mode" value="range" onchange="setCsvExportModeFromUi('range')"> Periodo personalizado</label>
+    </div>
+    <div class="movement-range hide" id="csv-export-month-wrap">
+      <div class="field" style="width:100%;"><div class="field-label">Mes</div><input type="month" id="csv-export-month"></div>
+    </div>
+    <div class="movement-months hide" id="csv-export-months-wrap">
+      <div id="csv-export-months"></div>
+    </div>
+    <div class="movement-range hide" id="csv-export-range-wrap">
+      <div class="field"><div class="field-label">Desde</div><input type="date" id="csv-export-start"></div>
+      <div class="field"><div class="field-label">Hasta</div><input type="date" id="csv-export-end"></div>
+    </div>
+    <div class="movement-filter-actions">
+      <button type="button" class="modal-submit secondary" onclick="closeCsvExportModal()"><i data-lucide="x"></i>Cancelar</button>
+      <button type="button" class="modal-submit" onclick="applyCsvExportSettings()"><i data-lucide="download"></i>Descargar</button>
     </div>
   </div>
 </div>
