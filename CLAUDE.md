@@ -129,7 +129,9 @@ Una sola página con cuatro vistas que se muestran/ocultan con la clase `.hide`
 - `sim` — el simulador "¿Qué hago con esta plata?" y los ahorros inmovilizados.
 - `history` — gráfico de gastos por mes, **donut de gastos por categoría con
   porcentajes** (`renderCategoryChart`, SVG con `stroke-dasharray`, respeta el
-  periodo) y lista completa de movimientos.
+  periodo) y lista completa de movimientos. La lista se ordena por fecha del
+  movimiento descendente y, para el mismo día, por timestamp de creación descendente;
+  los movimientos históricos sin timestamp quedan después de los que sí lo tienen.
 
 En ambas listas (`home` y `history`) cada movimiento es clicable para editarlo o
 eliminarlo (ver "Editar/eliminar movimientos" en Arquitectura).
