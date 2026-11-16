@@ -2078,9 +2078,9 @@ function listenToTransactions(uid) {
   const q = query(collection(db, "users", uid, "transactions"), orderBy("fecha", "desc"));
   unsubTx = onSnapshot(q, (snap) => {
     allTransactions = snap.docs.map(d => ({
-  id: d.id,
-  ...d.data()
-}));
+      id: d.id,
+      ...d.data({ serverTimestamps: "estimate" })
+    }));
     renderAll();
   });
 }
@@ -2272,7 +2272,7 @@ const emptyState = (title, sub, cta) => `
 function getFilteredTransactions() {
   const base = txInPeriod()
     .slice()
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    .sort(compareTransactionsNewestFirst);
 
   if (movementFilter === "latest10") return base.slice(0, 10);
   if (movementFilter === "all") return base;
@@ -2286,6 +2286,39 @@ function getFilteredTransactions() {
     return base.filter(t => t.fecha >= movementStartDate && t.fecha <= movementEndDate);
   }
   return base;
+}
+
+function getTransactionCreatedAtMillis(transaction) {
+  const createdAt = transaction.creadoEn || transaction.createdAt;
+  if (!createdAt) return null;
+  if (typeof createdAt.toMillis === "function") {
+    const millis = createdAt.toMillis();
+    return Number.isFinite(millis) ? millis : null;
+  }
+  if (createdAt instanceof Date) {
+    const millis = createdAt.getTime();
+    return Number.isFinite(millis) ? millis : null;
+  }
+  if (typeof createdAt === "number") return Number.isFinite(createdAt) ? createdAt : null;
+  if (typeof createdAt === "string") {
+    const millis = Date.parse(createdAt);
+    return Number.isFinite(millis) ? millis : null;
+  }
+  return null;
+}
+
+function compareTransactionsNewestFirst(a, b) {
+  const dateCompare = String(b.fecha || "").localeCompare(String(a.fecha || ""));
+  if (dateCompare !== 0) return dateCompare;
+
+  const aCreatedAt = getTransactionCreatedAtMillis(a);
+  const bCreatedAt = getTransactionCreatedAtMillis(b);
+  if (aCreatedAt !== null && bCreatedAt !== null && aCreatedAt !== bCreatedAt) {
+    return bCreatedAt - aCreatedAt;
+  }
+  if (aCreatedAt !== null && bCreatedAt === null) return -1;
+  if (aCreatedAt === null && bCreatedAt !== null) return 1;
+  return String(a.id || "").localeCompare(String(b.id || ""));
 }
 
 function getMovementFilterLabel() {
@@ -3623,4 +3656,3 @@ window.deleteSavings = async (id) => {
     showToast("Error al eliminar el ahorro", true);
   }
 };
-
