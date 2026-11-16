@@ -239,6 +239,7 @@ Cada deuda es un documento con campos comunes y campos específicos del tipo:
 2. **Modal de pago:**
    - **Caso Tarjetas de Crédito (`debtType === "tarjeta"`)**: Se abre el modal de tarjetas (`openTarjetaPayModal`) precargado con `refAbono` y `refIntereses`. Al confirmar (`confirmTarjetaPayment`), se registra una transacción por el total (abono + intereses) y se resta solo el `abono a la deuda` del saldo.
    - **Caso Crédito Automático (`debtType === "automatico"`)**: Se abre el modal quincenal por conceptos (`buildPartialDebtPayModal`) precargado con los valores de referencia (`refCapital`, `refIntereses`, `refSeguro`, `refOtros`). Al confirmar (`confirmPartialDebtPayment`), se registra la transacción por el total y se resta solo el `abono a capital` del saldo.
+   - Los formularios de pagos de deuda predeterminan la fecha según `America/Bogota`; al guardar se conserva el valor `YYYY-MM-DD` seleccionado sin conversión UTC.
 3. **Modal de conceptos (Libranza/Abono Parcial):**
    - Inicializa los conceptos y permite agregar/eliminar conceptos.
    - Selecciona por defecto "Quincena 1" o "Quincena 2" según la fecha elegida (1-15 vs 16+), o "Abono Extraordinario" si se requiere.

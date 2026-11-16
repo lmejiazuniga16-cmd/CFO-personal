@@ -87,6 +87,16 @@ const DEUDAS_INICIALES = [
 ];
 
 const todayISO = () => new Date().toISOString().split("T")[0];
+const todayBogotaISO = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const part = (type) => parts.find((item) => item.type === type).value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
 
 const AHORROS_INICIALES = {
   ahorros: [
@@ -1418,7 +1428,7 @@ window.openTarjetaPayModal = (id) => {
       
       <div class="field">
         <div class="field-label">Fecha del pago</div>
-        <input type="date" id="tarjeta-pay-date" value="${todayISO()}" onchange="updateTarjetaPaySummary()">
+        <input type="date" id="tarjeta-pay-date" value="${todayBogotaISO()}" onchange="updateTarjetaPaySummary()">
       </div>
       
       <div class="field">
@@ -1503,7 +1513,7 @@ window.confirmTarjetaPayment = async () => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return closeDebtPayModal();
   
-  const fecha = document.getElementById("tarjeta-pay-date").value || todayISO();
+  const fecha = document.getElementById("tarjeta-pay-date").value || todayBogotaISO();
   const abono = parseFloat(document.getElementById("tarjeta-pay-abono").value);
   const intereses = parseFloat(document.getElementById("tarjeta-pay-intereses").value);
   
@@ -1577,7 +1587,7 @@ function buildDebtPayModal(debt) {
       </div>
       <div class="field">
         <div class="field-label">Fecha</div>
-        <input type="date" id="debt-pay-date" value="${todayISO()}">
+        <input type="date" id="debt-pay-date" value="${todayBogotaISO()}">
       </div>
       <div style="display:flex;gap:10px;margin-top:12px;">
         <button class="modal-submit" id="debt-pay-confirm" onclick="confirmDebtPayment()">${iconHtml("check")}Confirmar</button>
@@ -1596,7 +1606,7 @@ function buildPartialDebtPayModal(debt) {
       
       <div class="field">
         <div class="field-label">Fecha del descuento</div>
-        <input type="date" id="partial-pay-date" value="${todayISO()}">
+        <input type="date" id="partial-pay-date" value="${todayBogotaISO()}">
       </div>
       
       <div class="field">
@@ -1771,7 +1781,7 @@ window.confirmPartialDebtPayment = async () => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return closeDebtPayModal();
   
-  const fecha = document.getElementById("partial-pay-date").value || todayISO();
+  const fecha = document.getElementById("partial-pay-date").value || todayBogotaISO();
   const quincena = document.getElementById("partial-pay-quincena").value;
   
   const container = document.getElementById("partial-pay-concepts-container");
@@ -1910,7 +1920,7 @@ window.confirmDebtPayment = async () => {
   const debt = debtsState.find(d => d.id === id);
   if (!debt) return closeDebtPayModal();
   const raw = document.getElementById('debt-pay-amount')?.value;
-  const fecha = document.getElementById('debt-pay-date')?.value || todayISO();
+  const fecha = document.getElementById('debt-pay-date')?.value || todayBogotaISO();
   if (!raw) { showToast('Monto inválido', true); return; }
   const amount = parseFloat(String(raw).replace(/\./g, '').replace(/,/g, ''));
   if (isNaN(amount) || amount <= 0) { showToast('Monto inválido', true); return; }
