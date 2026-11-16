@@ -145,8 +145,10 @@ eliminarlo (ver "Editar/eliminar movimientos" en Arquitectura).
 - Render: funciones `renderX()` que reconstruyen `innerHTML` a partir del estado en
   memoria (`allTransactions`, `debtsState`, `categoriasGasto`, `categoriasIngreso`).
 - Formato de moneda: helper `fmt(n)` → pesos colombianos con `toLocaleString("es-CO")`.
-- Fechas: ISO `YYYY-MM-DD` como string; `todayISO()` para la fecha de hoy. Los filtros
-  por mes usan `fecha.startsWith("YYYY-MM")`.
+- Fechas: ISO `YYYY-MM-DD` como string. `todayISO()` obtiene el día actual de
+  `America/Bogota` por sus componentes locales (sin convertir desde UTC) y se usa como
+  valor predeterminado en los formularios; al guardar, las fechas seleccionadas se
+  conservan como strings en Firestore. Los filtros por mes usan `fecha.startsWith("YYYY-MM")`.
 - Iconos por categoría: `ICON_MAP` (nombre de categoría → nombre de icono Lucide),
   con `DEFAULT_ICON` de respaldo. Helper `catIcon(nombre)` para resolverlo.
 - Categorías: editables por la usuaria, persistidas en `meta/categorias` junto con su

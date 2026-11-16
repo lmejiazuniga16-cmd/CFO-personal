@@ -86,7 +86,6 @@ const DEUDAS_INICIALES = [
   }
 ];
 
-const todayISO = () => new Date().toISOString().split("T")[0];
 const todayBogotaISO = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota",
@@ -97,6 +96,7 @@ const todayBogotaISO = () => {
   const part = (type) => parts.find((item) => item.type === type).value;
   return `${part("year")}-${part("month")}-${part("day")}`;
 };
+const todayISO = () => todayBogotaISO();
 
 const AHORROS_INICIALES = {
   ahorros: [
@@ -960,9 +960,7 @@ window.renderDebitCuotasConfig = (savedData = null) => {
     } else {
       const debt = editingDebtId ? debtsState.find(d => d.id === editingDebtId) : null;
       if (debt && debt.debitDay1) {
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const [yyyy, mm] = todayISO().split("-");
         const dd = String(debt.debitDay1).padStart(2, '0');
         date1 = `${yyyy}-${mm}-${dd}`;
       }
@@ -1019,9 +1017,7 @@ window.renderDebitCuotasConfig = (savedData = null) => {
       } else {
         const debt = editingDebtId ? debtsState.find(d => d.id === editingDebtId) : null;
         if (debt && debt[`debitDay${i}`]) {
-          const today = new Date();
-          const yyyy = today.getFullYear();
-          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const [yyyy, mm] = todayISO().split("-");
           const dd = String(debt[`debitDay${i}`]).padStart(2, '0');
           dateVal = `${yyyy}-${mm}-${dd}`;
         }
@@ -1967,7 +1963,8 @@ function getLastDayOfMonth(year, month) {
 
 async function processAutoDebits(uid) {
   if (!uid) return;
-  const today = new Date();
+  const [todayYear, todayMonth, todayDay] = todayISO().split("-").map(Number);
+  const today = new Date(todayYear, todayMonth - 1, todayDay, 12, 0, 0);
   const debtsSnap = await getDocs(collection(db, "users", uid, "debts"));
   let debts = debtsSnap.docs.map(d => d.data());
   for (let debt of debts) {
@@ -1997,7 +1994,7 @@ async function processAutoDebits(uid) {
         if (dueDate > today) continue;
         if (startDate && dueDate < startDate) continue;
         if (lastProcessed && dueDate <= lastProcessed) continue;
-        debt = await applyDebtPayment(debt, p.amount, dueDate.toISOString().split("T")[0], true);
+        debt = await applyDebtPayment(debt, p.amount, formatISODate(dueDate), true);
       }
       cursor.setMonth(cursor.getMonth() + 1);
       if (cursor.getFullYear() === today.getFullYear() && cursor.getMonth() > today.getMonth()) break;
